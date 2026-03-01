@@ -37,14 +37,14 @@ class MatrixVoipRoomComponent
 
   @override
   onSync(JoinedRoomUpdate update) {
-    if (update.timeline?.events == null) {
-      return;
-    }
+    final hasCallMemberEvent =
+        update.timeline?.events?.any((e) => e.type == callMemberStateEvent) ==
+                true ||
+            update.state?.any((e) => e.type == callMemberStateEvent) ==
+                true;
 
-    for (var event in update.timeline!.events!) {
-      if (event.type == callMemberStateEvent) {
-        _onParticipantsChanged.add(());
-      }
+    if (hasCallMemberEvent) {
+      _onParticipantsChanged.add(());
     }
   }
 
@@ -55,13 +55,29 @@ class MatrixVoipRoomComponent
       return [];
     }
 
+    final localUserId = client.matrixClient.userID;
+
     List<String> participants = List.empty(growable: true);
+
+    // Optimistically include ourselves if we've joined, before the server sync
+    // comes back with our updated state.
+    if (currentSession != null && localUserId != null) {
+      participants.add(localUserId);
+    }
+
     for (var pair in state.entries) {
       if (pair.value.content.isEmpty) {
         continue;
       }
 
       final sender = pair.value.senderId;
+
+      // Optimistically exclude ourselves if we've left the call, before the
+      // server sync comes back with our cleared state.
+      if (currentSession == null && sender == localUserId) {
+        continue;
+      }
+
       if (participants.contains(sender)) {
         continue;
       }
@@ -79,6 +95,7 @@ class MatrixVoipRoomComponent
   Future<VoipSession?> joinCall() async {
     currentSession = await backend.join();
     currentSession?.onStateChanged.listen(onStateChanged);
+    _onParticipantsChanged.add(());
     return currentSession;
   }
 
@@ -94,6 +111,7 @@ class MatrixVoipRoomComponent
 
     if (state == VoipState.ended) {
       currentSession = null;
+      _onParticipantsChanged.add(());
     }
   }
 
