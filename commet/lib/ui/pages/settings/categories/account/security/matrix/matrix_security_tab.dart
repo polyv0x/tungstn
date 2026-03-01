@@ -125,8 +125,9 @@ class _MatrixSecurityTabState extends State<MatrixSecurityTab> {
                     widget.client.getMatrixClient(),
                     onUpdated: () {
                       setState(() {
-                        getDevices();
+                        devices = null;
                       });
+                      getDevices();
                     },
                   ),
                 );
