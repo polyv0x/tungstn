@@ -246,9 +246,9 @@ class MatrixLivekitVoipSession implements VoipSession {
 
   @override
   Future<void> setScreenShare(ScreenCaptureSource source) async {
-    if (source is WebrtcAndroidScreencaptureSource) {
-      livekitRoom.localParticipant?.setScreenShareEnabled(true);
-      Log.i("Got android screen capture source!");
+    if (source is WebrtcAndroidScreencaptureSource ||
+        source is _WebScreencaptureSource) {
+      await livekitRoom.localParticipant?.setScreenShareEnabled(true);
       _stateChanged.add(());
       return;
     }
@@ -345,6 +345,9 @@ class MatrixLivekitVoipSession implements VoipSession {
 
   @override
   Future<ScreenCaptureSource?> pickScreenCapture(BuildContext context) async {
+    if (PlatformUtils.isWeb) {
+      return _WebScreencaptureSource();
+    }
     if (PlatformUtils.isAndroid) {
       return WebrtcAndroidScreencaptureSource.getCaptureSource(context);
     }
@@ -430,3 +433,5 @@ class MatrixLivekitVoipSession implements VoipSession {
     Log.i("Disconnected livekit room");
   }
 }
+
+class _WebScreencaptureSource implements ScreenCaptureSource {}
