@@ -334,15 +334,15 @@ class Preferences {
   DoublePreference streamBitrate =
       DoublePreference("screenshare_bitrate_mbps", defaultValue: 8);
 
-  DoublePreference streamFramerate =
-      DoublePreference("screenshare_fps", defaultValue: 60);
+  StringPreference streamFramerate =
+      StringPreference("screenshare_fps", defaultValue: "30");
 
   StringPreference streamCodec =
       StringPreference("livekit_screenshare_codec", defaultValue: "av1");
 
   StringPreference streamResolution = StringPreference(
       "livekit_screenshare_resolution",
-      defaultValue: "1920x1080");
+      defaultValue: "1080p");
 
   DoublePreference appScale = DoublePreference("app_scale", defaultValue: 1.0);
 

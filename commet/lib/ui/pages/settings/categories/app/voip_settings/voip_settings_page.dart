@@ -83,24 +83,28 @@ class _VoipSettingsPage extends State<VoipSettingsPage> {
                       title: "Use simulcast",
                       description:
                           "Uploads your streams at multiple different levels of quality, so other users can decide which to use. This will use more bandwidth and system resources."),
+                  StringPreferenceOptionsPicker(
+                    preference: preferences.streamResolution,
+                    title: "Stream Resolution",
+                    description:
+                        "Resolution of your screen share. 'Source' captures at the original resolution.",
+                    options: ["Source", "720p", "1080p", "1440p"],
+                  ),
+                  StringPreferenceOptionsPicker(
+                    preference: preferences.streamFramerate,
+                    title: "Stream Framerate",
+                    description:
+                        "Target frames per second. Higher is smoother but uses more bandwidth.",
+                    options: ["15", "30", "60"],
+                  ),
                   DoublePreferenceSlider(
                     preference: preferences.streamBitrate,
-                    min: 1,
+                    min: 0,
                     max: 32,
                     units: "Mbps",
                     title: "Stream Maximum Bitrate",
                     description:
-                        "Determines the overall quality of your stream. Higher is better, but also uses more resources",
-                  ),
-                  DoublePreferenceSlider(
-                    preference: preferences.streamFramerate,
-                    min: 5,
-                    max: 60,
-                    numDecimals: 0,
-                    units: "FPS",
-                    title: "Stream Framerate",
-                    description:
-                        "Target frames per second for screen sharing. Higher has smoother motion, but maybe reduce visual clarity.",
+                        "Maximum bitrate for your stream. Set to 0 to use an automatic bitrate based on resolution.",
                   ),
                   StringPreferenceOptionsPicker(
                       preference: preferences.streamCodec,
@@ -113,20 +117,7 @@ class _VoipSettingsPage extends State<VoipSettingsPage> {
                         "vp9",
                         "vp8",
                         "av1",
-                      ]),
-                  if (preferences.developerMode.value)
-                    StringPreferenceOptionsPicker(
-                        preference: preferences.streamResolution,
-                        title: "Stream Resolution",
-                        description:
-                            "The resolution of your stream, higher is better",
-                        options: [
-                          "640x360",
-                          "960x540",
-                          "1280x720",
-                          "1920x1080",
-                          "2560x1440",
-                        ])
+                      ])
                 ])),
         if (preferences.developerMode.value)
           const Padding(

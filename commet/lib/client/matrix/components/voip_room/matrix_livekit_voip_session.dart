@@ -255,28 +255,31 @@ class MatrixLivekitVoipSession implements VoipSession {
 
     final src = (source as WebrtcScreencaptureSource).source;
 
-    var bitrate = (preferences.streamBitrate.value * 1_000_000).toInt();
-    var framerate = preferences.streamFramerate.value;
+    var framerate = double.tryParse(preferences.streamFramerate.value) ?? 30.0;
     var codec = preferences.streamCodec.value;
-    var res = lk.VideoDimensionsPresets.h720_169;
 
-    try {
-      var resolution = preferences.streamResolution;
-      var parts = resolution.value.split("x");
-      res = lk.VideoDimensions(int.parse(parts[0]), int.parse(parts[1]));
-    } catch (e, s) {
-      Log.onError(e, s, content: "Error calculating desired resolution");
-    }
+    final resolutionMap = {
+      "720p": (lk.VideoDimensions(1280, 720), 4_000_000),
+      "1080p": (lk.VideoDimensions(1920, 1080), 8_000_000),
+      "1440p": (lk.VideoDimensions(2560, 1440), 16_000_000),
+      "Source": (lk.VideoDimensions(3840, 2160), 20_000_000),
+    };
+    final (dims, autoBitrate) =
+        resolutionMap[preferences.streamResolution.value] ??
+            (lk.VideoDimensions(1920, 1080), 8_000_000);
+    var bitrate = preferences.streamBitrate.value > 0
+        ? (preferences.streamBitrate.value * 1_000_000).toInt()
+        : autoBitrate;
 
     Log.i(
-        "Starting stream with settings: ${preferences.streamBitrate.value}Mbps, ${framerate}FPS, $codec ${res}");
+        "Starting stream with settings: ${bitrate ~/ 1_000_000}Mbps, ${framerate}FPS, $codec $dims");
 
     var track = await lk.LocalVideoTrack.createScreenShareTrack(
         lk.ScreenShareCaptureOptions(
       sourceId: src.id,
       maxFrameRate: framerate,
       params: lk.VideoParameters(
-        dimensions: lk.VideoDimensionsPresets.h720_169,
+        dimensions: dims,
         encoding: lk.VideoEncoding(
             maxFramerate: framerate.toInt(), maxBitrate: bitrate),
       ),
@@ -288,10 +291,10 @@ class MatrixLivekitVoipSession implements VoipSession {
     await livekitRoom.localParticipant?.publishVideoTrack(track,
         publishOptions: lk.VideoPublishOptions(
           simulcast: preferences.doSimulcast.value,
-          screenShareEncoding: lk.VideoEncoding(
-              maxFramerate: framerate.toInt(), maxBitrate: bitrate),
-          videoEncoding: lk.VideoEncoding(
-              maxFramerate: framerate.toInt(), maxBitrate: bitrate),
+          screenShareEncoding:
+              lk.VideoEncoding(maxFramerate: framerate.toInt(), maxBitrate: bitrate),
+          videoEncoding:
+              lk.VideoEncoding(maxFramerate: framerate.toInt(), maxBitrate: bitrate),
           videoCodec: preferences.streamCodec.value,
         ));
 
