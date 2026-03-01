@@ -334,6 +334,16 @@ class Preferences {
   DoublePreference streamBitrate =
       DoublePreference("screenshare_bitrate_mbps", defaultValue: 8);
 
+  static const List<String> streamResolutionOptions = [
+    "Source",
+    "720p",
+    "1080p",
+    "1440p"
+  ];
+  static const List<String> streamFramerateOptions = ["15", "30", "60"];
+  static const double streamBitrateMin = 0;
+  static const double streamBitrateMax = 32;
+
   StringPreference streamFramerate =
       StringPreference("screenshare_fps", defaultValue: "30");
 

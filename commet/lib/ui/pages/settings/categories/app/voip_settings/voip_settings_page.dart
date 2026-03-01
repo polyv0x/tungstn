@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:commet/client/components/voip/webrtc_default_devices.dart';
 import 'package:commet/config/platform_utils.dart';
+import 'package:commet/config/preferences.dart';
 import 'package:commet/debug/log.dart';
 import 'package:commet/main.dart';
 import 'package:commet/ui/pages/settings/categories/app/boolean_toggle.dart';
@@ -88,19 +89,19 @@ class _VoipSettingsPage extends State<VoipSettingsPage> {
                     title: "Stream Resolution",
                     description:
                         "Resolution of your screen share. 'Source' captures at the original resolution.",
-                    options: ["Source", "720p", "1080p", "1440p"],
+                    options: Preferences.streamResolutionOptions,
                   ),
                   StringPreferenceOptionsPicker(
                     preference: preferences.streamFramerate,
                     title: "Stream Framerate",
                     description:
                         "Target frames per second. Higher is smoother but uses more bandwidth.",
-                    options: ["15", "30", "60"],
+                    options: Preferences.streamFramerateOptions,
                   ),
                   DoublePreferenceSlider(
                     preference: preferences.streamBitrate,
-                    min: 0,
-                    max: 32,
+                    min: Preferences.streamBitrateMin,
+                    max: Preferences.streamBitrateMax,
                     units: "Mbps",
                     title: "Stream Maximum Bitrate",
                     description:
