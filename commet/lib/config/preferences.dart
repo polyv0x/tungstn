@@ -34,6 +34,8 @@ class Preferences {
 
   static const String _systemHotkey = "system_wide_hotkey";
 
+  static const String _lastRoomPerSpace = "last_room_per_space";
+
   static final StreamController onSettingChangedController =
       StreamController.broadcast();
   Stream get onSettingChanged => onSettingChangedController.stream;
@@ -204,6 +206,14 @@ class Preferences {
         }));
 
     onSettingChangedController.add(null);
+  }
+
+  String? getLastRoomForSpace(String spaceId) {
+    return _preferences!.getString("$_lastRoomPerSpace.$spaceId");
+  }
+
+  Future<void> setLastRoomForSpace(String spaceId, String roomId) {
+    return _preferences!.setString("$_lastRoomPerSpace.$spaceId", roomId);
   }
 
   Future<void> clearRunningDonationCheckFlow() async {

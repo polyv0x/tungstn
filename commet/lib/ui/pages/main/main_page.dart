@@ -210,12 +210,26 @@ class MainPageState extends State<MainPage> {
     });
 
     EventBus.onSelectedSpaceChanged.add(space);
+
+    if (space != null) {
+      var lastRoomId = preferences.getLastRoomForSpace(space.identifier);
+      if (lastRoomId != null) {
+        var room = space.roomsWithChildren
+            .where((r) => r.identifier == lastRoomId)
+            .firstOrNull;
+        if (room != null) selectRoom(room);
+      }
+    }
   }
 
   void selectRoom(Room room, {bool bypassSpecialRoomType = false}) {
     if (room == currentRoom && bypassSpecialRoomType == showAsTextRoom) return;
 
     onRoomUpdateSubscription?.cancel();
+
+    if (_currentSpace != null) {
+      preferences.setLastRoomForSpace(_currentSpace!.identifier, room.identifier);
+    }
 
     setState(() {
       _currentRoom = room;
