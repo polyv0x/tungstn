@@ -32,6 +32,7 @@ class _SignupPageState extends State<SignupPage> {
   bool loadingServerInfo = false;
   bool isServerValid = false;
   bool isRegistering = false;
+  bool requiresToken = false;
 
   @override
   void initState() {
@@ -53,6 +54,7 @@ class _SignupPageState extends State<SignupPage> {
       isRegistering: isRegistering,
       loadingServerInfo: loadingServerInfo,
       isServerValid: isServerValid,
+      requiresToken: requiresToken,
       hasSsoSupport: loginFlows?.whereType<SsoLoginFlow>().isNotEmpty == true,
       updateHomeserver: (value) {
         setState(() {
@@ -83,10 +85,12 @@ class _SignupPageState extends State<SignupPage> {
       loadingServerInfo = false;
       isServerValid = result.$1;
       loginFlows = result.$2;
+      requiresToken = result.$4;
     });
   }
 
-  Future<void> _doRegister(String username, String password) async {
+  Future<void> _doRegister(String username, String password,
+      {String? token}) async {
     if (signupClient is! MatrixClient) return;
     if (!isServerValid) return;
 
@@ -94,8 +98,8 @@ class _SignupPageState extends State<SignupPage> {
       isRegistering = true;
     });
 
-    final result =
-        await (signupClient as MatrixClient).register(username, password);
+    final result = await (signupClient as MatrixClient)
+        .register(username, password, registrationToken: token);
 
     if (result is! LoginResultSuccess) {
       setState(() {

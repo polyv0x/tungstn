@@ -247,7 +247,7 @@ class MatrixBackgroundClient implements Client {
   }
 
   @override
-  Future<(bool, List<LoginFlow>?)> setHomeserver(Uri uri) {
+  Future<(bool, List<LoginFlow>?, bool, bool)> setHomeserver(Uri uri) {
     throw UnimplementedError();
   }
 

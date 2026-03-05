@@ -142,7 +142,7 @@ abstract class Client {
 
   Future<void> init(bool loadingFromCache, {bool isBackgroundService = false});
 
-  Future<(bool, List<LoginFlow>?)> setHomeserver(Uri uri);
+  Future<(bool, List<LoginFlow>?, bool, bool)> setHomeserver(Uri uri);
 
   Future<LoginResult> executeLoginFlow(LoginFlow flow);
 

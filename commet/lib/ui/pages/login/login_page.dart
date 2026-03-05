@@ -53,6 +53,7 @@ class LoginPageState extends State<LoginPage> {
   bool loadingServerInfo = false;
   bool isServerValid = false;
   bool isLoggingIn = false;
+  bool canRegister = true;
 
   @override
   void initState() {
@@ -90,6 +91,7 @@ class LoginPageState extends State<LoginPage> {
       hasPasswordSupport:
           loginFlows?.whereType<PasswordLoginFlow>().isNotEmpty == true,
       isServerValid: isServerValid,
+      canRegister: canRegister,
       onLoginSuccess: widget.onSuccess,
     );
   }
@@ -184,6 +186,7 @@ class LoginPageState extends State<LoginPage> {
       loadingServerInfo = false;
       isServerValid = result.$1;
       loginFlows = result.$2;
+      canRegister = result.$3;
     });
   }
 }

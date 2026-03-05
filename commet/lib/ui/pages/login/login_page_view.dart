@@ -30,6 +30,7 @@ class LoginPageView extends StatefulWidget {
       this.isServerValid = false,
       this.hasSsoSupport = false,
       this.hasPasswordSupport = false,
+      this.canRegister = true,
       this.updateHomeserver,
       this.onLoginSuccess});
   final bool canNavigateBack;
@@ -41,6 +42,7 @@ class LoginPageView extends StatefulWidget {
   final bool isServerValid;
   final bool hasSsoSupport;
   final bool hasPasswordSupport;
+  final bool canRegister;
   final Future<void> Function(SsoLoginFlow flow)? doSsoLogin;
   final Future<void> Function(
           PasswordLoginFlow flow, String username, String password)?
@@ -297,31 +299,33 @@ class _LoginPageViewState extends State<LoginPageView> {
         const SizedBox(height: 16),
         loginButton(),
         const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(width: 100, height: 10, child: tiamat.Seperator()),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: tiamat.Text.labelLow(CommonStrings.labelOr),
-            ),
-            const SizedBox(width: 100, height: 10, child: tiamat.Seperator()),
-          ],
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: tiamat.Button.secondary(
-            text: "Create account",
-            onTap: () => NavigationUtils.navigateTo(
-                context,
-                SignupPage(
-                  onSuccess: widget.onLoginSuccess,
-                )),
+        if (widget.canRegister) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(width: 100, height: 10, child: tiamat.Seperator()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: tiamat.Text.labelLow(CommonStrings.labelOr),
+              ),
+              const SizedBox(width: 100, height: 10, child: tiamat.Seperator()),
+            ],
           ),
-        ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: tiamat.Button.secondary(
+              text: "Create account",
+              onTap: () => NavigationUtils.navigateTo(
+                  context,
+                  SignupPage(
+                    onSuccess: widget.onLoginSuccess,
+                  )),
+            ),
+          ),
+        ],
       ],
     );
   }

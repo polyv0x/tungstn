@@ -375,7 +375,15 @@ class MatrixClient extends Client {
   }
 
   Future<void> _postLoginSuccess() async {
+    await _matrixClient.init(
+      waitForFirstSync: false,
+      waitUntilLoadCompletedLoaded: true,
+      startSyncLoop: true,
+    );
     await _updateOwnProfile();
+    firstSync = _matrixClient.oneShotSync().then((_) {
+      firstSyncComplete = true;
+    });
     for (var component in getAllComponents()!) {
       if (component is NeedsPostLoginInit) {
         (component as NeedsPostLoginInit).postLoginInit();
@@ -799,7 +807,7 @@ class MatrixClient extends Client {
   }
 
   @override
-  Future<(bool, List<LoginFlow>?)> setHomeserver(Uri uri) async {
+  Future<(bool, List<LoginFlow>?, bool, bool)> setHomeserver(Uri uri) async {
     try {
       var result = await _matrixClient.checkHomeserver(uri);
 
@@ -815,10 +823,39 @@ class MatrixClient extends Client {
         resultFlows.addAll(await _getSsoFlows());
       }
 
-      return (true, resultFlows);
+      final (canRegister, requiresToken) = await _checkRegistrationEnabled();
+
+      return (true, resultFlows, canRegister, requiresToken);
     } catch (error, trace) {
       Log.onError(error, trace);
-      return (false, null);
+      return (false, null, false, false);
+    }
+  }
+
+  Future<(bool canRegister, bool requiresToken)> _checkRegistrationEnabled() async {
+    try {
+      await _matrixClient.request(
+        matrix.RequestType.POST,
+        "/client/v3/register",
+        data: {"kind": "user"},
+      );
+      return (true, false);
+    } on matrix.MatrixException catch (e) {
+      // Check UIA challenge first (401 with flows) — registration is available
+      if (e.requireAdditionalAuthentication) {
+        final requiresToken = e.authenticationFlows?.any(
+              (flow) => flow.stages.contains('m.login.registration_token'),
+            ) ==
+            true;
+        return (true, requiresToken);
+      }
+      // 403 M_FORBIDDEN — registration is disabled
+      if (e.error == matrix.MatrixError.M_FORBIDDEN) {
+        return (false, false);
+      }
+      return (true, false);
+    } catch (_) {
+      return (true, false);
     }
   }
 
@@ -857,13 +894,62 @@ class MatrixClient extends Client {
     return result;
   }
 
-  Future<LoginResult> register(String username, String password) async {
+  Future<LoginResult> register(String username, String password,
+      {String? registrationToken}) async {
     try {
-      await _matrixClient.register(
-        username: username,
-        password: password,
-        initialDeviceDisplayName: BuildConfig.appName,
-      );
+      if (registrationToken != null) {
+        // Step 1: initial POST to get the UIA session.
+        // Synapse auto-completes m.login.dummy at this point.
+        String? session;
+        try {
+          await _matrixClient.register(
+            username: username,
+            password: password,
+            initialDeviceDisplayName: BuildConfig.appName,
+          );
+        } on matrix.MatrixException catch (e) {
+          if (e.requireAdditionalAuthentication) {
+            session = e.session;
+          } else {
+            rethrow;
+          }
+        }
+
+        // Step 2: submit the registration token.
+        // AuthenticationData.toJson() only serialises type+session, so we
+        // subclass it to include the token field — the same pattern the SDK
+        // uses for AuthenticationToken.
+        try {
+          await _matrixClient.register(
+            username: username,
+            password: password,
+            initialDeviceDisplayName: BuildConfig.appName,
+            auth: _RegistrationTokenAuth(
+              token: registrationToken,
+              session: session,
+            ),
+          );
+        } on matrix.MatrixException catch (e) {
+          if (!e.requireAdditionalAuthentication) rethrow;
+          // Step 3: Synapse requires the dummy stage after the token stage.
+          session = e.session ?? session;
+          await _matrixClient.register(
+            username: username,
+            password: password,
+            initialDeviceDisplayName: BuildConfig.appName,
+            auth: matrix.AuthenticationData(
+              type: matrix.AuthenticationTypes.dummy,
+              session: session,
+            ),
+          );
+        }
+      } else {
+        await _matrixClient.register(
+          username: username,
+          password: password,
+          initialDeviceDisplayName: BuildConfig.appName,
+        );
+      }
 
       if (_matrixClient.accessToken != null) {
         preferences.addRegisteredMatrixClient(identifier);
@@ -946,3 +1032,21 @@ class MatrixClient extends Client {
 }
 
 enum MatrixLinkType { room, roomAlias, user }
+
+/// AuthenticationData subclass that includes the registration token field.
+/// AuthenticationData.toJson() only serialises type+session, so we extend it
+/// the same way the SDK's AuthenticationToken does for m.login.token.
+class _RegistrationTokenAuth extends matrix.AuthenticationData {
+  final String token;
+
+  _RegistrationTokenAuth({required this.token, String? session})
+      : super(
+            type: 'm.login.registration_token',
+            session: session);
+
+  @override
+  Map<String, Object?> toJson() => {
+        ...super.toJson(),
+        'token': token,
+      };
+}

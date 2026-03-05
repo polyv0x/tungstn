@@ -19,6 +19,7 @@ class SignupPageView extends StatefulWidget {
     this.loadingServerInfo = false,
     this.isServerValid = false,
     this.hasSsoSupport = false,
+    this.requiresToken = false,
     required this.isRegistering,
   });
 
@@ -28,7 +29,9 @@ class SignupPageView extends StatefulWidget {
   final bool loadingServerInfo;
   final bool isServerValid;
   final bool hasSsoSupport;
-  final Future<void> Function(String username, String password)? doRegister;
+  final bool requiresToken;
+  final Future<void> Function(String username, String password,
+      {String? token})? doRegister;
   final Future<void> Function(SsoLoginFlow flow)? doSsoLogin;
   final Function(String)? updateHomeserver;
 
@@ -42,6 +45,7 @@ class _SignupPageViewState extends State<SignupPageView> {
   final TextEditingController _usernameField = TextEditingController();
   final TextEditingController _passwordField = TextEditingController();
   final TextEditingController _confirmPasswordField = TextEditingController();
+  final TextEditingController _tokenField = TextEditingController();
 
   String? _passwordError;
 
@@ -240,6 +244,20 @@ class _SignupPageViewState extends State<SignupPageView> {
         ),
         const SizedBox(height: 16),
 
+        // Invite token (only shown when server requires it)
+        if (widget.requiresToken) ...[
+          TextField(
+            autocorrect: false,
+            controller: _tokenField,
+            readOnly: widget.isRegistering,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              labelText: "Invite token",
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
         // Register button
         SizedBox(
           height: 50,
@@ -309,6 +327,10 @@ class _SignupPageViewState extends State<SignupPageView> {
       _passwordError = null;
     });
 
-    widget.doRegister?.call(_usernameField.text, password);
+    widget.doRegister?.call(
+      _usernameField.text,
+      password,
+      token: widget.requiresToken ? _tokenField.text : null,
+    );
   }
 }
