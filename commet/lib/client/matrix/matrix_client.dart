@@ -375,19 +375,23 @@ class MatrixClient extends Client {
   }
 
   Future<void> _postLoginSuccess() async {
-    await _matrixClient.init(
-      waitForFirstSync: false,
-      waitUntilLoadCompletedLoaded: true,
-      startSyncLoop: true,
-    );
-    await _updateOwnProfile();
-    firstSync = _matrixClient.oneShotSync().then((_) {
-      firstSyncComplete = true;
-    });
-    for (var component in getAllComponents()!) {
-      if (component is NeedsPostLoginInit) {
-        (component as NeedsPostLoginInit).postLoginInit();
+    try {
+      await _matrixClient.init(
+        waitForFirstSync: false,
+        waitUntilLoadCompletedLoaded: false,
+        startSyncLoop: true,
+      );
+      await _updateOwnProfile();
+      firstSync = _matrixClient.oneShotSync().then((_) {
+        firstSyncComplete = true;
+      });
+      for (var component in getAllComponents()!) {
+        if (component is NeedsPostLoginInit) {
+          (component as NeedsPostLoginInit).postLoginInit();
+        }
       }
+    } catch (e, trace) {
+      Log.onError(e, trace, content: "Post-login initialization failed");
     }
   }
 
