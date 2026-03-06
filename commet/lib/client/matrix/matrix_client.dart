@@ -337,11 +337,20 @@ class MatrixClient extends Client {
       nativeImplementations: nativeImplementations,
       database: database,
       logLevel: matrix.Level.verbose,
+      shareKeysWith: _shareKeysWithFromPreference(),
     );
 
     client.onSyncStatus.stream.listen(onSyncStatusChanged);
 
     return client;
+  }
+
+  static matrix.ShareKeysWith _shareKeysWithFromPreference() {
+    return switch (preferences.shareKeysWith.value) {
+      "crossVerifiedIfEnabled" => matrix.ShareKeysWith.crossVerifiedIfEnabled,
+      "crossVerified" => matrix.ShareKeysWith.crossVerified,
+      _ => matrix.ShareKeysWith.all,
+    };
   }
 
   matrix.Client getMatrixClient() {

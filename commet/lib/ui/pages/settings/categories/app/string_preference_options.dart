@@ -55,6 +55,7 @@ class _StringPreferenceOptionsPickerState
                   setState(() {
                     if (item != null) {
                       widget.preference.set(item);
+                      widget.onChanged?.call(true);
                     }
                   });
                 },

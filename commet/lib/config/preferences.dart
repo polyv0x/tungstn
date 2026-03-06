@@ -400,4 +400,13 @@ class Preferences {
 
   NullableStringPreference lastDownloadLocation =
       NullableStringPreference("last_download_location", defaultValue: null);
+
+  static const List<String> shareKeysWithOptions = [
+    "all",
+    "crossVerifiedIfEnabled",
+    "crossVerified",
+  ];
+
+  StringPreference shareKeysWith =
+      StringPreference("matrix_share_keys_with", defaultValue: "all");
 }

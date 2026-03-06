@@ -1,6 +1,9 @@
 import 'package:commet/client/matrix/matrix_client.dart';
+import 'package:commet/config/preferences.dart';
+import 'package:commet/main.dart';
 import 'package:commet/ui/navigation/adaptive_dialog.dart';
 import 'package:commet/ui/pages/settings/categories/account/security/matrix/session/matrix_session.dart';
+import 'package:commet/ui/pages/settings/categories/app/string_preference_options.dart';
 import 'package:commet/utils/common_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -137,6 +140,15 @@ class _MatrixSecurityTabState extends State<MatrixSecurityTab> {
     );
   }
 
+  String get labelShareKeysWith => Intl.message("Share keys with",
+      desc: "Title label for the key sharing mode setting",
+      name: "labelShareKeysWith");
+
+  String get labelShareKeysWithDescription => Intl.message(
+      "Controls which devices receive encryption keys. Use 'all' to allow unverified devices to decrypt messages",
+      desc: "Description for the key sharing mode setting",
+      name: "labelShareKeysWithDescription");
+
   Panel crossSigningPanel() {
     return Panel(
         header: labelMatrixCrossSigningAndBackup,
@@ -147,7 +159,22 @@ class _MatrixSecurityTabState extends State<MatrixSecurityTab> {
             children: [
               crossSigning(),
               const tiamat.Seperator(),
-              messageBackup()
+              messageBackup(),
+              const tiamat.Seperator(),
+              StringPreferenceOptionsPicker(
+                preference: preferences.shareKeysWith,
+                title: labelShareKeysWith,
+                description: labelShareKeysWithDescription,
+                options: Preferences.shareKeysWithOptions,
+                onChanged: (_) {
+                  final value = preferences.shareKeysWith.value;
+                  widget.client.getMatrixClient().shareKeysWith = switch (value) {
+                    "crossVerifiedIfEnabled" => ShareKeysWith.crossVerifiedIfEnabled,
+                    "crossVerified" => ShareKeysWith.crossVerified,
+                    _ => ShareKeysWith.all,
+                  };
+                },
+              ),
             ],
           ),
         ));
