@@ -197,9 +197,10 @@ flutter:
     - assets/js/package/
     - assets/vodozemac/
     - assets/data/
-  shaders: 
+  shaders:
     - assets/shader/texture_coordinate.frag
     - assets/shader/constellation.frag
+    - assets/shader/metaballs.frag
   fonts: 
     - family: Jellee
       fonts: 

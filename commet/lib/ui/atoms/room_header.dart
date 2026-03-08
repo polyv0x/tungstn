@@ -207,17 +207,19 @@ class HeaderView extends StatelessWidget {
                           textBaseline: TextBaseline.ideographic,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            m.Text(
-                              text,
-                              style: m.Theme.of(context)
-                                  .textTheme
-                                  .titleSmall!
-                                  .copyWith(
-                                      color: m.TextTheme.of(context)
-                                          .bodyMedium!
-                                          .color),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            Flexible(
+                              child: m.Text(
+                                text,
+                                style: m.Theme.of(context)
+                                    .textTheme
+                                    .titleSmall!
+                                    .copyWith(
+                                        color: m.TextTheme.of(context)
+                                            .bodyMedium!
+                                            .color),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             if (topic != null && topic!.isNotEmpty)
                               Padding(

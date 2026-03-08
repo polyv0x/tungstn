@@ -100,15 +100,32 @@ class _CallViewState extends State<CallView> {
   }
 
   Widget callConnectedView() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        var ratio = constraints.maxWidth / constraints.maxHeight;
-        if (ratio > 1) {
-          return Row(children: generateLayout());
-        } else {
-          return Column(children: generateLayout());
-        }
-      },
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              colors: [
+                const Color(0xFF4A2DB0), // blurple centre
+                surfaceColor,            // app surface at edges
+              ],
+              radius: 0.90,
+            ),
+          ),
+        ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final ratio = constraints.maxWidth / constraints.maxHeight;
+            if (ratio > 1) {
+              return Row(children: generateLayout());
+            } else {
+              return Column(children: generateLayout());
+            }
+          },
+        ),
+      ],
     );
   }
 
@@ -130,7 +147,6 @@ class _CallViewState extends State<CallView> {
                 child: VoipStreamView(
                   mainStream!,
                   widget.currentSession,
-                  borderColor: Colors.white,
                   onFullscreen: () {
                     Lightbox.show(context,
                         aspectRatio: mainStream!.aspectRatio,

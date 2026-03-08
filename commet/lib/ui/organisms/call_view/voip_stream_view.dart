@@ -104,7 +104,15 @@ class _VoipStreamViewState extends State<VoipStreamView>
   Widget buildDefault() {
     switch (widget.stream.type) {
       case VoipStreamType.audio:
-        return tiamat.Tile.low(
+        final userColor = HSLColor.fromColor(user.defaultColor)
+            .withLightness(0.12)
+            .withSaturation(0.55)
+            .toColor();
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: userColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
           child: Center(
               child: Stack(
             alignment: AlignmentGeometry.bottomRight,
@@ -114,15 +122,17 @@ class _VoipStreamViewState extends State<VoipStreamView>
                 child: AnimatedOpacity(
                   opacity: widget.stream.isMuted ? 0.5 : 1.0,
                   duration: Duration(milliseconds: 200),
-                  child: tiamat.Avatar(
-                      border: Border.all(
-                          strokeAlign: 0.5,
-                          color: getBorderColor(context),
-                          width: clampDouble(audioLevel.value * 15, 0, 5)),
-                      radius: 50,
-                      image: user.avatar,
-                      placeholderColor: user.defaultColor,
-                      placeholderText: user.displayName),
+                  child: ClipOval(
+                    child: tiamat.Avatar(
+                        border: Border.all(
+                            strokeAlign: 0.5,
+                            color: getBorderColor(context),
+                            width: clampDouble(audioLevel.value * 15, 0, 5)),
+                        radius: 50,
+                        image: user.avatar,
+                        placeholderColor: user.defaultColor,
+                        placeholderText: user.displayName),
+                  ),
                 ),
               ),
               AnimatedScale(
