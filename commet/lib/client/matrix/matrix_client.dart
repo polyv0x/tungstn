@@ -91,6 +91,18 @@ class MatrixClient extends Client {
     return MatrixClient(identifier: identifier, database: database);
   }
 
+  /// Returns a deterministic client name for the primary account, or a
+  /// timestamp-based name for additional accounts.  Using a stable name
+  /// means the same IndexedDB / SQLite database is reused across logins,
+  /// preserving E2EE keys and other cached data.
+  static String newLoginClientName() {
+    final existing = preferences.getRegisteredMatrixClients();
+    if (existing == null || existing.isEmpty) {
+      return 'commet-${BuildConfig.PLATFORM}';
+    }
+    return 'commet-${DateTime.now().millisecondsSinceEpoch}';
+  }
+
   static String hash(String name) {
     var bytes = utf8.encode(name);
     var hash = sha256.convert(bytes);
@@ -384,23 +396,80 @@ class MatrixClient extends Client {
   }
 
   Future<void> _postLoginSuccess() async {
-    try {
-      await _matrixClient.init(
-        waitForFirstSync: false,
-        waitUntilLoadCompletedLoaded: false,
-        startSyncLoop: true,
-      );
-      await _updateOwnProfile();
-      firstSync = _matrixClient.oneShotSync().then((_) {
-        firstSyncComplete = true;
-      });
-      for (var component in getAllComponents()!) {
-        if (component is NeedsPostLoginInit) {
-          (component as NeedsPostLoginInit).postLoginInit();
-        }
+    // login() already calls init() internally which sets up encryption,
+    // persists credentials, loads rooms, and starts the sync loop.
+    // Do NOT call _matrixClient.init() again — the SDK throws
+    // "User is already logged in!" if init() is called twice.
+
+    await _updateOwnProfile();
+    firstSyncComplete = true;
+
+    for (var component in getAllComponents()!) {
+      if (component is NeedsPostLoginInit) {
+        (component as NeedsPostLoginInit).postLoginInit();
       }
-    } catch (e, trace) {
-      Log.onError(e, trace, content: "Post-login initialization failed");
+    }
+
+  }
+
+  /// Checks if server-side key backup exists and needs unlocking.
+  /// Returns true if backup is available but not yet cached (needs recovery key).
+  Future<bool> hasRestorableKeyBackup() async {
+    final encryption = _matrixClient.encryption;
+    if (encryption == null) {
+      Log.i("Key backup check: encryption is null");
+      return false;
+    }
+
+    Log.i("Key backup check: waiting for account data...");
+    await _matrixClient.accountDataLoading;
+    Log.i("Key backup check: account data loaded");
+
+    try {
+      final info = await _matrixClient.getRoomKeysVersionCurrent();
+      Log.i("Key backup check: backup found, version=${info.version}, count=${info.count}");
+    } on matrix.MatrixException catch (e) {
+      Log.i("Key backup check: no backup on server (${e.errcode})");
+      if (e.errcode == 'M_NOT_FOUND') return false;
+      return false;
+    } catch (e) {
+      Log.i("Key backup check: error checking backup: $e");
+      return false;
+    }
+
+    if (!encryption.keyManager.enabled) {
+      Log.i("Key backup check: keyManager not enabled (no SSSS secret)");
+      return false;
+    }
+
+    final cached = await encryption.keyManager.isCached();
+    if (cached) {
+      Log.i("Key backup check: already cached, no restore needed");
+      return false;
+    }
+
+    Log.i("Key backup check: backup available and needs restore");
+    return true;
+  }
+
+  /// Unlocks SSSS with the given recovery key or passphrase and restores
+  /// all encryption keys from server-side backup.
+  Future<bool> restoreKeyBackup(String keyOrPassphrase) async {
+    try {
+      final encryption = _matrixClient.encryption!;
+      final openSsss = encryption.ssss.open();
+
+      await openSsss.unlock(keyOrPassphrase: keyOrPassphrase);
+      await openSsss.maybeCacheAll();
+      await encryption.crossSigning
+          .selfSign(keyOrPassphrase: keyOrPassphrase);
+
+      await encryption.keyManager.loadAllKeys();
+
+      return true;
+    } catch (e) {
+      Log.w("Key restore failed: $e");
+      return false;
     }
   }
 
@@ -423,7 +492,7 @@ class MatrixClient extends Client {
         });
       } else {
         self = MatrixProfile(this,
-            await _matrixClient.getProfileFromUserId(_matrixClient.userID!));
+            await _matrixClient.getProfileFromUserId(id));
       }
     }
   }
@@ -794,6 +863,10 @@ class MatrixClient extends Client {
   }
 
   void onSyncStatusChanged(matrix.SyncStatusUpdate event) {
+    if (event.status == matrix.SyncStatus.error) {
+      Log.w("Sync error details: error=${event.error}, exception=${event.error?.exception}, stackTrace=${event.error?.stackTrace}");
+    }
+
     ClientConnectionStatus value = ClientConnectionStatus.unknown;
 
     var connected = _matrixClient.onSync.value != null &&
@@ -1063,3 +1136,4 @@ class _RegistrationTokenAuth extends matrix.AuthenticationData {
         'token': token,
       };
 }
+

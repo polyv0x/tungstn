@@ -7,7 +7,6 @@ import 'package:commet/main.dart';
 import 'package:commet/ui/navigation/adaptive_dialog.dart';
 import 'package:commet/ui/pages/signup/signup_page_view.dart';
 import 'package:commet/utils/debounce.dart';
-import 'package:commet/utils/rng.dart';
 import 'package:flutter/material.dart';
 import 'package:tiamat/tiamat.dart' as tiamat;
 
@@ -37,7 +36,7 @@ class _SignupPageState extends State<SignupPage> {
   @override
   void initState() {
     super.initState();
-    MatrixClient.create(RandomUtils.getRandomString(20)).then((client) {
+    MatrixClient.create(MatrixClient.newLoginClientName()).then((client) {
       signupClient = client;
       progressSubscription =
           signupClient!.connectionStatusChanged.stream.listen(

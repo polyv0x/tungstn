@@ -111,7 +111,9 @@ class MatrixUserPresenceComponent
   @override
   Future<void> setStatus(UserPresenceStatus status,
       {String? message, bool clearMessage = false}) async {
+    if (!client.isLoggedIn()) return;
     final self = client.self!.identifier;
+    if (!self.startsWith('@')) return;
 
     final current = await client.matrixClient.getPresence(self);
 

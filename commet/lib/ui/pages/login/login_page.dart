@@ -6,7 +6,6 @@ import 'package:commet/client/matrix/matrix_client.dart';
 import 'package:commet/main.dart';
 import 'package:commet/ui/pages/login/login_page_view.dart';
 import 'package:commet/utils/debounce.dart';
-import 'package:commet/utils/rng.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:commet/ui/navigation/adaptive_dialog.dart' show AdaptiveDialog, DialogType;
@@ -57,7 +56,7 @@ class LoginPageState extends State<LoginPage> {
 
   @override
   void initState() {
-    var internalId = RandomUtils.getRandomString(20);
+    var internalId = MatrixClient.newLoginClientName();
     MatrixClient.create(internalId).then((client) {
       loginClient = client;
 
@@ -144,6 +143,7 @@ class LoginPageState extends State<LoginPage> {
 
     if (result is LoginResultSuccess) {
       clientManager?.addClient(loginClient!);
+
       widget.onSuccess?.call(loginClient!);
     }
   }

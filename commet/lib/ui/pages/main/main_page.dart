@@ -10,6 +10,7 @@ import 'package:commet/client/components/voip/voip_component.dart';
 import 'package:commet/client/components/voip/voip_session.dart';
 import 'package:commet/client/matrix/matrix_client.dart';
 import 'package:commet/config/layout_config.dart';
+import 'package:commet/ui/molecules/key_restore_dialog.dart';
 import 'package:commet/debug/log.dart';
 import 'package:commet/main.dart';
 import 'package:commet/ui/navigation/adaptive_dialog.dart';
@@ -137,6 +138,21 @@ class MainPageState extends State<MainPage> {
       var menus = FirstTimeSetup.postLogin;
       if (menus.isNotEmpty) {
         NavigationUtils.navigateTo(context, SetupPage(menus));
+      }
+
+      _checkKeyBackupRestore();
+    }
+  }
+
+  Future<void> _checkKeyBackupRestore() async {
+    for (var client in widget.clientManager.clients) {
+      if (client is MatrixClient) {
+        if (await client.hasRestorableKeyBackup()) {
+          if (mounted) {
+            await KeyRestoreDialog.show(context, client);
+          }
+          break;
+        }
       }
     }
   }
