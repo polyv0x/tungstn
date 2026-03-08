@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:commet/client/components/calendar_room/calendar_room_component.dart';
+import 'package:commet/client/components/voip/voip_session.dart';
 import 'package:commet/client/components/voip_room/voip_room_component.dart';
 import 'package:commet/client/room.dart';
 import 'package:commet/main.dart';
@@ -105,6 +106,13 @@ class _RoomTextButtonState extends State<RoomTextButton> {
       color = Theme.of(context).colorScheme.onSurface;
     }
 
+    var iconColor = color;
+
+    if (voipRoom?.currentSession != null &&
+        voipRoom!.currentSession!.state != VoipState.ended) {
+      iconColor = Colors.lightGreen;
+    }
+
     bool showRoomIcons = preferences.showRoomAvatars.value;
     bool useGenericIcons = preferences.usePlaceholderRoomAvatars.value;
 
@@ -158,10 +166,14 @@ class _RoomTextButtonState extends State<RoomTextButton> {
         avatarRadius: 12,
         avatarPlaceholderColor: avatarPlaceholderColor,
         avatarPlaceholderText: avatarPlaceholderText,
-        iconColor: color,
+        iconColor: iconColor,
         textColor: color,
         softwrap: false,
-        onTap: () => widget.onTap?.call(widget.room),
+        mouseCursor: SystemMouseCursors.click,
+        onTap: () {
+          widget.onTap?.call(widget.room);
+          _maybeAutoJoinVoip(context);
+        },
         footer: widget.room.displayHighlightedNotificationCount > 0
             ? NotificationBadge(widget.room.displayHighlightedNotificationCount)
             : widget.room.displayNotificationCount > 0
@@ -280,6 +292,19 @@ class _RoomTextButtonState extends State<RoomTextButton> {
         context,
       ),
     );
+  }
+
+  void _maybeAutoJoinVoip(BuildContext context) {
+    if (voipRoom == null ||
+        !voipRoom!.canJoinCall ||
+        voipRoom!.currentSession != null) return;
+
+    clientManager?.callManager
+        .requestExclusiveSession(
+            context, widget.room.identifier, widget.room.client)
+        .then((allowed) {
+      if (allowed == true && mounted) voipRoom!.joinCall();
+    });
   }
 
   void onVoipParticipantsChanged(void event) {

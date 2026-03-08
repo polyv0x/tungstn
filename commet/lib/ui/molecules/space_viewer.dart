@@ -8,9 +8,11 @@ class SpaceViewer extends StatefulWidget {
     this.space, {
     super.key,
     this.onRoomSelected,
+    this.initialSelectedRoom,
   });
   final Space space;
   final void Function(Room, {bool bypassSpecialRoomType})? onRoomSelected;
+  final Room? initialSelectedRoom;
 
   @override
   State<SpaceViewer> createState() => _SpaceViewerState();
@@ -26,6 +28,7 @@ class _SpaceViewerState extends State<SpaceViewer> {
           child: SpaceList(
             widget.space,
             onRoomSelected: widget.onRoomSelected,
+            initialSelectedRoom: widget.initialSelectedRoom,
           )),
     );
   }

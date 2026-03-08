@@ -222,12 +222,9 @@ Future<void> initGuiRequirements() async {
 
   var locale = PlatformDispatcher.instance.locale;
 
-  Future.wait([
-    UnicodeEmojis.load(),
-    initializeMessages(locale.languageCode),
-    initializeDateFormatting(locale.languageCode),
-    // initializeMessagesDebug()
-  ]);
+  await UnicodeEmojis.load();
+  await initializeMessages(locale.languageCode);
+  await initializeDateFormatting(locale.languageCode);
 
   Intl.defaultLocale = locale.languageCode;
 }

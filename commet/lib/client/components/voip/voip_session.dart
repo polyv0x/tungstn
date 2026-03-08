@@ -46,6 +46,9 @@ abstract class VoipSession {
   /// Round-trip time in milliseconds, or null if unavailable.
   double? get latencyMs;
 
+  /// Fraction of packets lost [0.0–1.0], or null if unavailable.
+  double? get packetLossRate;
+
   VoipStream? get remoteUserMediaStream;
 
   List<VoipStream> get streams;

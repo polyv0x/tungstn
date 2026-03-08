@@ -84,6 +84,9 @@ class MatrixVoipSession implements VoipSession {
   double? get latencyMs => null;
 
   @override
+  double? get packetLossRate => null;
+
+  @override
   String? get remoteUserName => session.remoteUser?.displayName;
 
   @override

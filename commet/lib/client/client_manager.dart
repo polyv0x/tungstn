@@ -5,6 +5,7 @@ import 'package:commet/client/call_manager.dart';
 import 'package:commet/client/client.dart';
 import 'package:commet/client/components/direct_messages/direct_message_aggregator.dart';
 import 'package:commet/client/components/direct_messages/direct_message_component.dart';
+import 'package:commet/client/components/user_presence/user_presence_component.dart';
 import 'package:commet/client/matrix/matrix_client.dart';
 import 'package:commet/client/stale_info.dart';
 import 'package:commet/client/tasks/client_connection_status_task.dart';
@@ -22,6 +23,18 @@ class ClientManager {
   late CallManager callManager;
 
   late final DirectMessagesAggregator directMessages;
+
+  // Own-user presence: single subscription per client, shared across widgets.
+  final Map<String, UserPresence> _ownPresences = {};
+  final Set<String> _ownPresenceSubscribed = {};
+  final _ownPresenceController =
+      StreamController<(String, UserPresence)>.broadcast();
+
+  Stream<(String, UserPresence)> get onOwnPresenceChanged =>
+      _ownPresenceController.stream;
+
+  UserPresence ownPresenceFor(String clientId) =>
+      _ownPresences[clientId] ?? UserPresence(UserPresenceStatus.unknown);
 
   ClientManager() {
     directMessages = DirectMessagesAggregator(this);
@@ -128,8 +141,45 @@ class ClientManager {
             .listen((event) => _onClientConnectionStatusChanged(client, event)),
       ];
 
+      _subscribeOwnPresence(client);
+
       onClientAdded.add(_clients.length - 1);
     } catch (error) {}
+  }
+
+  void _subscribeOwnPresence(Client client) async {
+    if (_ownPresenceSubscribed.contains(client.identifier)) return;
+
+    final selfId = client.self?.identifier;
+    final presenceComp = client.getComponent<UserPresenceComponent>();
+
+    if (selfId == null || presenceComp == null) {
+      // self not yet available (pre-sync); retry after the next sync.
+      client.onSync.first.then((_) => _subscribeOwnPresence(client));
+      return;
+    }
+
+    _ownPresenceSubscribed.add(client.identifier);
+
+    presenceComp.onPresenceChanged
+        .where((t) => t.$1 == selfId)
+        .listen((t) => _setOwnPresence(client.identifier, t.$2));
+
+    // The server doesn't echo own presence back, so the cached value is
+    // typically stale (offline from the last session). Since we've just
+    // synced, the user is online — default to that unless the server later
+    // sends an explicit update via onPresenceChanged.
+    final initial = await presenceComp.getUserPresence(selfId);
+    final effective = (initial.status == UserPresenceStatus.offline ||
+            initial.status == UserPresenceStatus.unknown)
+        ? UserPresence(UserPresenceStatus.online)
+        : initial;
+    _setOwnPresence(client.identifier, effective);
+  }
+
+  void _setOwnPresence(String clientId, UserPresence presence) {
+    _ownPresences[clientId] = presence;
+    _ownPresenceController.add((clientId, presence));
   }
 
   void _onClientConnectionStatusChanged(
@@ -212,6 +262,8 @@ class ClientManager {
     onClientRemoved.add(clientInfo);
     _clients.remove(client.identifier);
     _clientsList.removeAt(clientIndex);
+    _ownPresences.remove(client.identifier);
+    _ownPresenceSubscribed.remove(client.identifier);
   }
 
   void removeClient(Client client) {

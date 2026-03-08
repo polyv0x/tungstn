@@ -9,7 +9,9 @@ import 'package:commet/client/components/voip/voip_component.dart';
 import 'package:commet/client/components/voip/voip_session.dart';
 import 'package:commet/client/stale_info.dart';
 import 'package:commet/config/platform_utils.dart';
+import 'package:commet/ui/navigation/adaptive_dialog.dart';
 import 'package:commet/utils/notifying_list.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:media_kit/media_kit.dart';
 
@@ -59,7 +61,12 @@ class CallManager {
 
   void _onClientRemoved(StalePeerInfo event) {}
 
+  // Guards against concurrent join attempts racing through requestExclusiveSession
+  // before either session appears in currentSessions.
+  bool _joiningInProgress = false;
+
   void onClientSessionStarted(VoipSession event) {
+    _joiningInProgress = false;
     var room = event.client.getRoom(event.roomId);
     currentSessions.add(event);
 
@@ -103,11 +110,68 @@ class CallManager {
     currentSessions
         .removeWhere((element) => element.sessionId == event.sessionId);
 
+    if (currentSessions.isEmpty) _joiningInProgress = false;
+
     if (currentSessions.where((e) => e.state == VoipState.incoming).isEmpty) {
       stopRingtone();
     }
 
     endCallSound();
+  }
+
+  /// Ensures at most one voice session is active. Call this before joining any
+  /// voice channel or starting a call. Returns true if the caller may proceed,
+  /// false if the user cancelled.
+  Future<bool> requestExclusiveSession(
+      BuildContext context, String targetRoomId, Client targetClient) async {
+    final active = currentSessions
+        .where((s) => s.state != VoipState.ended)
+        .toList();
+
+    if (active.isEmpty) {
+      if (_joiningInProgress) return false;
+      _joiningInProgress = true;
+      return true;
+    }
+
+    final existing = active.first;
+
+    if (_sameVoiceContext(existing, targetRoomId, targetClient)) {
+      await existing.hangUpCall();
+      return true;
+    }
+
+    final confirmed = await AdaptiveDialog.confirmation(
+      context,
+      title: "Switch voice channel",
+      prompt:
+          "You are currently connected to **${existing.roomName}**. Disconnect and join the new call?",
+      confirmationText: "Switch",
+      cancelText: "Cancel",
+    );
+
+    if (confirmed == true) {
+      await existing.hangUpCall();
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _sameVoiceContext(
+      VoipSession existing, String targetRoomId, Client targetClient) {
+    final existingSpaces = existing.client.spaces
+        .where((s) => s.containsRoom(existing.roomId))
+        .map((s) => s.identifier)
+        .toSet();
+    final targetSpaces = targetClient.spaces
+        .where((s) => s.containsRoom(targetRoomId))
+        .map((s) => s.identifier)
+        .toSet();
+    // Both are DMs (no parent space) → same context, switch silently
+    if (existingSpaces.isEmpty && targetSpaces.isEmpty) return true;
+    // Share at least one space → same context
+    return existingSpaces.intersection(targetSpaces).isNotEmpty;
   }
 
   VoipSession? getCallInRoom(Client client, String roomId) {

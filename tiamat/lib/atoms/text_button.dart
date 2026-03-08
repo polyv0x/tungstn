@@ -215,6 +215,7 @@ class TextButton extends StatelessWidget {
     this.customBuilder,
     this.softwrap,
     this.footer,
+    this.mouseCursor,
   });
   final String text;
 
@@ -227,6 +228,7 @@ class TextButton extends StatelessWidget {
   final double iconSize;
   final double avatarRadius;
   final void Function()? onTap;
+  final MouseCursor? mouseCursor;
   final Widget Function(Widget child, BuildContext context)? customBuilder;
   final Widget? footer;
   final Color? textColor;
@@ -314,6 +316,9 @@ class TextButton extends StatelessWidget {
                   Theme.of(context).colorScheme.secondaryContainer
               : null,
         ),
+        mouseCursor: mouseCursor != null
+            ? MaterialStatePropertyAll(mouseCursor!)
+            : null,
       ),
       child: content,
       onPressed: onTap,

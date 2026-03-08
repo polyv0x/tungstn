@@ -4,8 +4,8 @@ import 'package:commet/client/call_manager.dart';
 import 'package:commet/client/components/voip/voip_session.dart';
 import 'package:commet/config/preferences.dart';
 import 'package:commet/main.dart';
-import 'package:commet/ui/organisms/call_view/call_view.dart';
 import 'package:flutter/material.dart';
+import 'package:just_the_tooltip/just_the_tooltip.dart';
 import 'package:tiamat/tiamat.dart' as tiamat;
 
 class VoiceStatusPanel extends StatefulWidget {
@@ -20,9 +20,15 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
     with TickerProviderStateMixin {
   late List<StreamSubscription> _subs;
   bool _showStreamSettings = false;
-  AnimationController? _audioLevel;
   StreamSubscription? _sessionSub;
   StreamSubscription? _audioSub;
+  late AnimationController _slideController;
+  late Animation<double> _slideAnimation;
+  late AnimationController _settingsController;
+  late Animation<double> _settingsAnimation;
+
+  // Kept alive during the collapse animation so content doesn't vanish mid-slide.
+  VoipSession? _displayedSession;
 
   VoipSession? get _session =>
       widget.callManager.currentSessions.firstOrNull;
@@ -30,6 +36,29 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
   @override
   void initState() {
     super.initState();
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _slideAnimation = CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeInOut,
+    );
+    _slideController.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && mounted) {
+        setState(() => _displayedSession = null);
+      }
+    });
+
+    _settingsController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _settingsAnimation = CurvedAnimation(
+      parent: _settingsController,
+      curve: Curves.easeInOut,
+    );
+
     _subs = [
       widget.callManager.currentSessions.onListUpdated.listen((_) {
         _rebindSession();
@@ -37,25 +66,43 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
       }),
     ];
     _rebindSession();
+
+    // Already in a session on first build — skip the entrance animation.
+    if (_displayedSession != null) _slideController.value = 1.0;
   }
 
   void _rebindSession() {
     _sessionSub?.cancel();
     _audioSub?.cancel();
-    _audioLevel?.dispose();
-    _audioLevel = null;
 
     final session = _session;
-    if (session == null) return;
+    if (session == null || session.state == VoipState.ended) {
+      _slideController.reverse();
+      return;
+    }
 
-    _audioLevel = AnimationController(
-        vsync: this, duration: CallView.volumeAnimationDuration);
+    _displayedSession = session;
+    _slideController.forward();
 
-    _sessionSub = session.onStateChanged.listen((_) => setState(() {}));
+    _sessionSub = session.onStateChanged.listen((_) {
+      if (session.state == VoipState.ended) {
+        _audioSub?.cancel();
+        _slideController.reverse();
+        _settingsController.reverse();
+        _showStreamSettings = false;
+      }
+      // Collapse settings if streaming stopped while settings were open.
+      if (_showStreamSettings &&
+          !session.isSharingScreen &&
+          !session.isCameraEnabled) {
+        _settingsController.reverse();
+        _showStreamSettings = false;
+      }
+      setState(() {});
+    });
     _audioSub = session.onUpdateVolumeVisualizers.listen((_) async {
       await session.updateStats();
       if (mounted) setState(() {});
-      _audioLevel?.animateTo(session.generalAudioLevel);
     });
   }
 
@@ -66,16 +113,36 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
     }
     _sessionSub?.cancel();
     _audioSub?.cancel();
-    _audioLevel?.dispose();
+    _slideController.dispose();
+    _settingsController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final session = _session;
-    if (session == null) return const SizedBox.shrink();
-    if (session.state == VoipState.ended) return const SizedBox.shrink();
+    final session = _displayedSession;
 
+    return SizeTransition(
+      sizeFactor: _slideAnimation,
+      axisAlignment: 1.0,
+      child: ClipRect(
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).animate(_slideAnimation),
+          child: FadeTransition(
+            opacity: _slideAnimation,
+            child: session == null
+                ? const SizedBox.shrink()
+                : _buildContent(context, session),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, VoipSession session) {
     final room = session.client.getRoom(session.roomId);
     final spaceName = clientManager?.spaces
         .where((s) => s.containsRoom(session.roomId))
@@ -93,15 +160,74 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const tiamat.Seperator(),
           _statusHeader(context, session, roomLabel, connected),
           if (connected) _actionButtons(context, session),
-          if (_showStreamSettings &&
-              connected &&
-              (session.isSharingScreen || session.isCameraEnabled))
-            _streamSettingsPanel(context),
-          const tiamat.Seperator(),
+          if (connected && (session.isSharingScreen || session.isCameraEnabled))
+            SizeTransition(
+              sizeFactor: _settingsAnimation,
+              axisAlignment: -1.0,
+              child: ClipRect(
+                child: FadeTransition(
+                  opacity: _settingsAnimation,
+                  child: _streamSettingsPanel(context),
+                ),
+              ),
+            ),
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Divider(height: 1),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// Returns a quality score in [0.0, 1.0], or null if no stats yet.
+  double? _qualityScore(VoipSession session) {
+    final latency = session.latencyMs;
+    final loss = session.packetLossRate;
+    if (latency == null && loss == null) return null;
+    double score = 1.0;
+    if (latency != null) {
+      if (latency > 400) score = score.clamp(0.0, 0.15);
+      else if (latency > 200) score = score.clamp(0.0, 0.40);
+      else if (latency > 100) score = score.clamp(0.0, 0.65);
+    }
+    if (loss != null) {
+      if (loss > 0.10) score = score.clamp(0.0, 0.15);
+      else if (loss > 0.05) score = score.clamp(0.0, 0.40);
+      else if (loss > 0.01) score = score.clamp(0.0, 0.65);
+    }
+    return score;
+  }
+
+  Widget _signalIcon(double? quality, Color borderColor) {
+    final Color iconColor;
+    final IconData iconData;
+
+    if (quality == null) {
+      iconColor = Colors.grey;
+      iconData = Icons.signal_cellular_0_bar;
+    } else if (quality >= 0.65) {
+      iconColor = Colors.lightGreen;
+      iconData = Icons.signal_cellular_alt;
+    } else if (quality >= 0.35) {
+      iconColor = Colors.orange;
+      iconData = Icons.signal_cellular_alt_2_bar;
+    } else {
+      iconColor = Colors.red;
+      iconData = Icons.signal_cellular_alt_1_bar;
+    }
+
+    return SizedBox.square(
+      dimension: 22,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: borderColor.withAlpha(30),
+          borderRadius: BorderRadius.circular(5),
+          border: Border.all(color: borderColor.withAlpha(80), width: 1),
+        ),
+        child: Center(child: Icon(iconData, color: iconColor, size: 16)),
       ),
     );
   }
@@ -118,41 +244,34 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
     };
 
     final latency = session.latencyMs;
-    final latencyLabel =
-        latency != null ? '${latency.round()} ms' : 'Unknown';
+    final loss = session.packetLossRate;
+    final latencyLabel = latency != null ? '${latency.round()} ms' : 'Unknown';
+    final lossLabel = loss != null
+        ? '${(loss * 100).toStringAsFixed(1)}%'
+        : 'Unknown';
+    final quality = connected ? _qualityScore(session) : null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 4, 4),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Network icon spanning both rows
-            Tooltip(
-              message: latencyLabel,
-              preferBelow: false,
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: scheme.outlineVariant, width: 1),
+            // Signal quality icon spanning both rows
+            JustTheTooltip(
+              content: Padding(
+                padding: const EdgeInsets.all(8),
+                child: tiamat.Text('Latency: $latencyLabel\nPacket loss: $lossLabel'),
               ),
-              textStyle: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: scheme.onSurface),
+              preferredDirection: AxisDirection.up,
+              offset: 5,
+              tailLength: 5,
+              tailBaseWidth: 5,
+              backgroundColor: scheme.surfaceContainerLowest,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 6, 0),
                 child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: statusColor.withAlpha(30),
-                      borderRadius: BorderRadius.circular(5),
-                      border:
-                          Border.all(color: statusColor.withAlpha(80), width: 1),
-                    ),
-                    child: Icon(Icons.wifi, color: statusColor, size: 14),
-                  ),
+                  child: _signalIcon(quality, statusColor),
                 ),
               ),
             ),
@@ -162,24 +281,12 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Row(
-                    children: [
-                      Text(
-                        statusText,
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(color: statusColor),
-                      ),
-                      if (connected && _audioLevel != null) ...[
-                        const SizedBox(width: 6),
-                        AnimatedBuilder(
-                          animation: _audioLevel!,
-                          builder: (context, _) =>
-                              _audioLevelBars(_audioLevel!.value, statusColor),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    statusText,
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelMedium
+                        ?.copyWith(color: statusColor),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -193,13 +300,15 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
               ),
             ),
             // Disconnect button spanning both rows
-            SizedBox(
-              width: 36,
-              child: tiamat.IconButton(
-                icon: Icons.call_end,
-                iconColor: scheme.error,
-                size: 16,
-                onPressed: () => session.hangUpCall(),
+            Center(
+              child: SizedBox.square(
+                dimension: 32,
+                child: tiamat.IconButton(
+                  icon: Icons.call_end,
+                  iconColor: scheme.error,
+                  size: 16,
+                  onPressed: () => session.hangUpCall(),
+                ),
               ),
             ),
           ],
@@ -208,41 +317,16 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
     );
   }
 
-  Widget _audioLevelBars(double level, Color color) {
-    const barCount = 3;
-    const barWidth = 3.0;
-    const maxHeight = 10.0;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.end,
-      spacing: 2,
-      children: List.generate(barCount, (i) {
-        final threshold = (i + 1) / barCount;
-        final active = level >= threshold;
-        return Container(
-          width: barWidth,
-          height: maxHeight * ((i + 1) / barCount),
-          decoration: BoxDecoration(
-            color: active ? color : color.withAlpha(60),
-            borderRadius: BorderRadius.circular(1),
-          ),
-        );
-      }),
-    );
-  }
-
   Widget _actionButtons(BuildContext context, VoipSession session) {
-    const radius = 16.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        spacing: 4,
+        mainAxisAlignment: MainAxisAlignment.end,
+        spacing: 0,
         children: [
           if (session.supportsScreenshare) ...[
             if (!session.isSharingScreen)
-              tiamat.CircleButton(
-                radius: radius,
+              _actionButton(
                 icon: Icons.screen_share_outlined,
                 onPressed: () async {
                   final source = await session.pickScreenCapture(context);
@@ -250,34 +334,47 @@ class _VoiceStatusPanelState extends State<VoiceStatusPanel>
                 },
               ),
             if (session.isSharingScreen)
-              tiamat.CircleButton(
-                radius: radius,
+              _actionButton(
                 icon: Icons.stop_screen_share,
                 onPressed: () => session.stopScreenshare(),
               ),
           ],
           if (session.isCameraEnabled)
-            tiamat.CircleButton(
-              radius: radius,
+            _actionButton(
               icon: Icons.no_photography,
               onPressed: () => session.stopCamera(),
             )
           else
-            tiamat.CircleButton(
-              radius: radius,
+            _actionButton(
               icon: Icons.camera_alt_outlined,
               onPressed: () => session.setCamera(null),
             ),
           if (session.isSharingScreen || session.isCameraEnabled)
-            tiamat.CircleButton(
-              radius: radius,
+            _actionButton(
               icon: _showStreamSettings
                   ? Icons.settings
                   : Icons.settings_outlined,
-              onPressed: () =>
-                  setState(() => _showStreamSettings = !_showStreamSettings),
+              onPressed: () {
+                setState(() => _showStreamSettings = !_showStreamSettings);
+                if (_showStreamSettings) {
+                  _settingsController.forward();
+                } else {
+                  _settingsController.reverse();
+                }
+              },
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _actionButton({required IconData icon, required VoidCallback onPressed}) {
+    return SizedBox.square(
+      dimension: 32,
+      child: tiamat.IconButton(
+        icon: icon,
+        size: 16,
+        onPressed: onPressed,
       ),
     );
   }

@@ -20,6 +20,7 @@ class SpaceList extends StatefulWidget {
       this.isTopLevel = true,
       this.currentDepth = 0,
       this.maxDepth = 5,
+      this.initialSelectedRoom,
       super.key});
   final Function(Room room, {bool bypassSpecialRoomType})? onRoomSelected;
 
@@ -30,6 +31,8 @@ class SpaceList extends StatefulWidget {
   final int maxDepth;
 
   final int currentDepth;
+
+  final Room? initialSelectedRoom;
 
   @override
   State<SpaceList> createState() => _SpaceListState();
@@ -43,6 +46,7 @@ class _SpaceListState extends State<SpaceList> {
   late List<StreamSubscription> subs;
 
   Room? selectedRoom;
+
   String get labelRoomsList => Intl.message("Rooms",
       desc: "Header label for the list of rooms", name: "labelRoomsList");
 
@@ -50,6 +54,7 @@ class _SpaceListState extends State<SpaceList> {
   void initState() {
     children = widget.space.children;
     previews = widget.space.childPreviews;
+    selectedRoom = widget.initialSelectedRoom;
 
     subs = [
       widget.space.onChildRoomPreviewAdded
@@ -193,6 +198,7 @@ class _SpaceListState extends State<SpaceList> {
                     isTopLevel: false,
                     currentDepth: widget.currentDepth + 1,
                     onRoomSelected: widget.onRoomSelected,
+                    initialSelectedRoom: widget.initialSelectedRoom,
                   ),
                 )
               ]),

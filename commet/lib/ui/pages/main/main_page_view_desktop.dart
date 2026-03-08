@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:commet/client/call_manager.dart';
 import 'package:commet/client/components/profile/profile_component.dart';
+import 'package:commet/ui/atoms/own_user_avatar.dart';
 import 'package:commet/client/components/voip/voip_session.dart';
 import 'package:commet/config/layout_config.dart';
 import 'package:commet/main.dart';
@@ -18,7 +19,6 @@ import 'package:commet/ui/organisms/home_screen/home_screen.dart';
 import 'package:commet/ui/organisms/room_quick_access_menu/room_quick_access_menu_desktop.dart';
 import 'package:commet/ui/organisms/room_side_panel/room_side_panel.dart';
 import 'package:commet/ui/organisms/side_navigation_bar/side_navigation_bar.dart';
-import 'package:commet/ui/organisms/sidebar_call_icon/sidebar_calls_list.dart';
 import 'package:commet/ui/organisms/voice_status_panel/voice_status_panel.dart';
 import 'package:commet/ui/organisms/space_summary/space_summary.dart';
 import 'package:commet/ui/pages/main/main_page.dart';
@@ -76,14 +76,7 @@ class MainPageViewDesktop extends StatelessWidget {
                                 bottom: false,
                                 child: SideNavigationBar(
                                   currentUser: state.currentUser,
-                                  extraEntryBuilders: [
-                                    (width) {
-                                      return SidebarCallsList(
-                                        state.clientManager.callManager,
-                                        width,
-                                      );
-                                    },
-                                  ],
+                                  extraEntryBuilders: const [],
                                   onSpaceSelected: (space) {
                                     state.selectSpace(space);
                                   },
@@ -113,7 +106,8 @@ class MainPageViewDesktop extends StatelessWidget {
                         ],
                       ),
                     ),
-                    tiamat.Tile.low(
+                    tiamat.Tile(
+                      mode: TileType.surfaceDim,
                       caulkPadTop: true,
                       caulkClipTopRight: true,
                       caulkBorderTop: true,
@@ -135,7 +129,7 @@ class MainPageViewDesktop extends StatelessWidget {
                   ],
                 ),
               ),
-              Expanded(child: mainView(context)),
+              mainView(context),
             ],
           ),
           if (state.currentRoom != null)
@@ -157,6 +151,9 @@ class MainPageViewDesktop extends StatelessWidget {
     if (clientManager!.clients.length == 1) {
       current = clientManager!.clients.first.self;
     }
+
+    // Capture identifier as a final local so it promotes safely inside closures.
+    final currentId = current?.identifier;
 
     return Material(
       color: Colors.transparent,
@@ -193,16 +190,17 @@ class MainPageViewDesktop extends StatelessWidget {
                   spacing: 8,
                   children: [
                     if (current != null)
-                      tiamat.Avatar(
+                      OwnUserAvatar(
+                        client: clientManager!.clients.firstWhere(
+                            (c) => c.self?.identifier == currentId,
+                            orElse: () => clientManager!.clients.first),
                         radius: avatarRadius,
-                        image: current.avatar,
-                        placeholderColor: current.defaultColor,
-                        placeholderText: current.displayName,
                       ),
                     if (current != null)
                       Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             tiamat.Text.name(
                                 maxLines: 1,
@@ -256,23 +254,26 @@ class MainPageViewDesktop extends StatelessWidget {
               ),
             )),
           ),
-          Row(
-            children: [
-              _CallMuteButton(
-                  state.clientManager.callManager,
-                  size: height),
-              SizedBox(
-                  width: height,
-                  height: height,
-                  child: tiamat.IconButton(
-                    icon: Icons.settings,
-                    size: height / 4,
-                    onPressed: () {
-                      NavigationUtils.navigateTo(
-                          context, const AppSettingsPage());
-                    },
-                  ))
-            ],
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Row(
+              children: [
+                _CallMuteButton(
+                    state.clientManager.callManager,
+                    size: height),
+                SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: tiamat.IconButton(
+                      icon: Icons.settings,
+                      size: 16,
+                      onPressed: () {
+                        NavigationUtils.navigateTo(
+                            context, const AppSettingsPage());
+                      },
+                    ))
+              ],
+            ),
           )
         ],
       )),
@@ -298,6 +299,7 @@ class MainPageViewDesktop extends StatelessWidget {
                 key: ValueKey(
                   "space-view-key-${state.currentSpace!.localId}",
                 ),
+                initialSelectedRoom: state.currentRoom,
                 onRoomSelected: (room, {bool bypassSpecialRoomType = false}) {
                   state.selectRoom(room,
                       bypassSpecialRoomType: bypassSpecialRoomType);
@@ -487,6 +489,7 @@ class MainPageViewDesktop extends StatelessWidget {
     return Placeholder();
   }
 }
+
 
 class _CallMuteButton extends StatefulWidget {
   const _CallMuteButton(this.callManager, {required this.size});

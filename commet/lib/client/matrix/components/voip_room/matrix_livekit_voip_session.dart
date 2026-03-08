@@ -370,15 +370,24 @@ class MatrixLivekitVoipSession implements VoipSession {
   bool get supportsScreenshare => true;
 
   double? _latencyMs;
+  double? _packetLossRate;
 
   @override
   double? get latencyMs => _latencyMs;
 
   @override
+  double? get packetLossRate => _packetLossRate;
+
+  @override
   Future<void> updateStats() async {
-    final rtt = await _getRttMs(livekitRoom.engine.publisher?.pc) ??
-        await _getRttMs(livekitRoom.engine.subscriber?.pc);
+    final pubPc = livekitRoom.engine.publisher?.pc;
+    final subPc = livekitRoom.engine.subscriber?.pc;
+
+    final rtt = await _getRttMs(pubPc) ?? await _getRttMs(subPc);
     if (rtt != null) _latencyMs = rtt;
+
+    final loss = await _getPacketLossRate(pubPc) ?? await _getPacketLossRate(subPc);
+    if (loss != null) _packetLossRate = loss;
   }
 
   Future<double?> _getRttMs(dynamic pc) async {
@@ -414,6 +423,23 @@ class MatrixLivekitVoipSession implements VoipSession {
       }
 
       return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<double?> _getPacketLossRate(dynamic pc) async {
+    if (pc == null) return null;
+    try {
+      final stats = await pc.getStats() as List;
+      final losses = <double>[];
+      for (final report in stats) {
+        if (report.type != 'remote-inbound-rtp') continue;
+        final raw = report.values['fractionLost'];
+        if (raw != null) losses.add((raw as num).toDouble());
+      }
+      if (losses.isEmpty) return null;
+      return losses.reduce((a, b) => a + b) / losses.length;
     } catch (_) {
       return null;
     }

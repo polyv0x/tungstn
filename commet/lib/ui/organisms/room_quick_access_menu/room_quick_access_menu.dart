@@ -48,8 +48,14 @@ class RoomQuickAccessMenu {
       if (canCall)
         RoomQuickAccessMenuEntry(
             name: "Call",
-            action: (context) =>
-                calls.startCall(room.identifier, CallType.voice),
+            action: (context) async {
+              final allowed = await clientManager?.callManager
+                  .requestExclusiveSession(
+                      context, room.identifier, room.client);
+              if (allowed == true) {
+                calls.startCall(room.identifier, CallType.voice);
+              }
+            },
             icon: Icons.call),
       if (!preferences.hideRoomSidePanel.value) ...[
         if (calendar?.hasCalendar == true && calendar?.isCalendarRoom == false)

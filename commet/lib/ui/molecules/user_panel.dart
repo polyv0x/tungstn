@@ -193,6 +193,9 @@ class UserPanelView extends material.StatelessWidget {
         color: material.Colors.transparent,
         child: material.InkWell(
           splashColor: material.Theme.of(context).highlightColor,
+          mouseCursor: onClicked != null
+              ? SystemMouseCursors.click
+              : MouseCursor.defer,
           onTap: onClicked,
           child: Padding(
             padding: padding ?? const EdgeInsets.fromLTRB(4, 2, 4, 2),

@@ -8,6 +8,7 @@ import 'package:commet/ui/atoms/shimmer_loading.dart';
 import 'package:commet/ui/layout/bento.dart';
 import 'package:commet/ui/navigation/adaptive_dialog.dart';
 import 'package:commet/ui/organisms/call_view/call.dart';
+import 'package:commet/main.dart';
 import 'package:commet/utils/common_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:tiamat/tiamat.dart' as tiamat;
@@ -38,6 +39,8 @@ class _VoipRoomViewState extends State<VoipRoomView> {
 
       setState(() {
         participants = widget.voip.getCurrentParticipants();
+        // Pick up a session started externally (e.g. from the sidebar tap).
+        currentSession ??= widget.voip.currentSession;
       });
     });
 
@@ -187,6 +190,10 @@ class _VoipRoomViewState extends State<VoipRoomView> {
   }
 
   joinRoomCall() async {
+    final allowed = await clientManager?.callManager.requestExclusiveSession(
+        context, widget.voip.room.identifier, widget.voip.client);
+    if (allowed != true) return;
+
     setState(() {
       joining = true;
     });
