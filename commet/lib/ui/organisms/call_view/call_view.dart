@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:commet/client/components/voip/voip_session.dart';
 import 'package:commet/client/components/voip/voip_stream.dart';
 import 'package:commet/client/room.dart';
+import 'package:commet/config/layout_config.dart';
 import 'package:commet/ui/atoms/lightbox.dart';
 import 'package:commet/ui/layout/bento.dart';
 import 'package:commet/ui/organisms/call_view/voip_fullscreen_stream_view.dart';
@@ -101,6 +102,9 @@ class _CallViewState extends State<CallView> {
 
   Widget callConnectedView() {
     final surfaceColor = Theme.of(context).colorScheme.surface;
+    final session = widget.currentSession;
+    final muted = session.isMicrophoneMuted || session.isDeafened;
+    final deafened = session.isDeafened;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -125,6 +129,53 @@ class _CallViewState extends State<CallView> {
             }
           },
         ),
+        if (Layout.mobile)
+          Positioned(
+            bottom: 28,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              spacing: 20,
+              children: [
+                tiamat.CircleButton(
+                  radius: 28,
+                  icon: muted ? Icons.mic_off : Icons.mic,
+                  color: Colors.white,
+                  iconColor: muted ? Colors.red : Colors.black87,
+                  onPressed: () async {
+                    if (deafened) {
+                      await session.setDeafened(false);
+                    } else {
+                      await widget.setMicrophoneMute
+                          ?.call(!session.isMicrophoneMuted);
+                    }
+                    setState(() {});
+                  },
+                ),
+                tiamat.CircleButton(
+                  radius: 28,
+                  icon: deafened ? Icons.headset_off : Icons.headphones,
+                  color: Colors.white,
+                  iconColor: deafened ? Colors.red : Colors.black87,
+                  onPressed: () async {
+                    await session.setDeafened(!deafened);
+                    setState(() {});
+                  },
+                ),
+                tiamat.CircleButton(
+                  radius: 28,
+                  icon: Icons.call_end,
+                  color: Colors.red,
+                  iconColor: Colors.white,
+                  onPressed: () async {
+                    await widget.hangUp?.call();
+                    setState(() {});
+                  },
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
