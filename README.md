@@ -1,6 +1,6 @@
 <p align="center" style="padding-top:20px">
 
-Tungstn is a privacy first evolution of Commet chat for the Matrix protocol.  [Matrix](https://matrix.org) focused on providing a feature rich experience while maintaining a simple interface. The goal is to build a secure, privacy respecting app without compromising on the features you have come to expect from a modern chat client.
+Tungstn is a privacy first evolution of Commet chat for the [Matrix](https://matrix.org) protocol focused on providing a feature rich experience while maintaining a simple interface. The goal is to build a secure, privacy respecting app without compromising on the features you have come to expect from a modern chat client.
 
 # Features
 - Supports **Windows**, **Linux**, and **Android** (MacOS and iOS planned in future)
@@ -8,6 +8,8 @@ Tungstn is a privacy first evolution of Commet chat for the Matrix protocol.  [M
 - Custom Emoji + Stickers
 - Tenor compatible API GIF Search (self hosted possible)
 - Threads
+- Uncapped screensharing 4k/2k/1080p/720p/source 15-30-60fps
+- More polished voice experience
 - Encrypted Room Search
 - Multiple Accounts
 - Spaces
