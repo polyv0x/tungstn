@@ -1,6 +1,7 @@
 import 'package:commet/config/build_config.dart';
 import 'package:commet/config/platform_utils.dart';
 import 'package:commet/main.dart';
+import 'package:commet/ui/pages/settings/categories/app/shortcut_settings/hyprland_shortcut_settings_page.dart';
 import 'package:commet/ui/pages/settings/categories/app/shortcut_settings/keyboard_hook_shortcuts_settings_page.dart';
 import 'package:commet/ui/pages/settings/categories/app/shortcut_settings/outsource_shortcut_settings_page.dart';
 import 'package:commet/utils/system_wide_shortcuts/system_wide_shortcuts.dart';
@@ -15,11 +16,13 @@ class ShortcutSettingsPage extends StatelessWidget {
       return Placeholder();
     }
 
-    bool showOutsourceMenu =
-        PlatformUtils.isDisplayServer(DisplayServer.Wayland) &&
-            PlatformUtils.isDesktopEnvironment(DesktopEnvironment.KDEPlasma);
+    final bool isHyprland = SystemWideShortcuts.isHyprland;
 
-    bool showHooksMenu = !showOutsourceMenu;
+    bool showOutsourceMenu = !isHyprland &&
+        PlatformUtils.isDisplayServer(DisplayServer.Wayland) &&
+        PlatformUtils.isDesktopEnvironment(DesktopEnvironment.KDEPlasma);
+
+    bool showHooksMenu = !isHyprland && !showOutsourceMenu;
 
     if (preferences.developerMode.value) {
       showHooksMenu = true;
@@ -32,8 +35,9 @@ class ShortcutSettingsPage extends StatelessWidget {
     return Column(
       spacing: 8,
       children: [
+        if (isHyprland) const HyprlandShortcutSettingsPage(),
         if (showOutsourceMenu) OutsourceShortcutSettingsPage(),
-        if (showHooksMenu) KeyboardHookShortcutsSettingsPage()
+        if (showHooksMenu) KeyboardHookShortcutsSettingsPage(),
       ],
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:commet/config/platform_utils.dart';
 import 'package:commet/main.dart';
 import 'package:commet/utils/system_wide_shortcuts/system_wide_shortcuts_linux.dart';
@@ -17,17 +19,15 @@ class SystemWideShortcuts {
     }
   }
 
+  static bool get isHyprland =>
+      PlatformUtils.isLinux &&
+      Platform.environment.containsKey('HYPRLAND_INSTANCE_SIGNATURE');
+
   static bool get isSupported {
     if (PlatformUtils.isWindows) return true;
-
-    if (PlatformUtils.isDisplayServer(DisplayServer.X11)) {
-      return true;
-    }
-
-    if (PlatformUtils.isDesktopEnvironment(DesktopEnvironment.KDEPlasma)) {
-      return true;
-    }
-
+    if (PlatformUtils.isDisplayServer(DisplayServer.X11)) return true;
+    if (PlatformUtils.isDesktopEnvironment(DesktopEnvironment.KDEPlasma)) return true;
+    if (isHyprland) return true;
     return false;
   }
 

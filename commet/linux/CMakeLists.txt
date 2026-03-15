@@ -1,18 +1,18 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.10)
-project(runner LANGUAGES CXX)
+project(runner LANGUAGES C CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "commet")
+set(BINARY_NAME "tungstn")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
 
-if ($ENV{COMMET_PROD} MATCHES "1")
-  set(APPLICATION_ID "chat.commet.commetapp")
+if ($ENV{TUNGSTN_PROD} MATCHES "1")
+  set(APPLICATION_ID "chat.tungstn.app")
   message("Building in PRODUCTION mode")
 else()
-  set(APPLICATION_ID "chat.commet.commetapp.develop")
+  set(APPLICATION_ID "chat.tungstn.app.develop")
   message("Building in DEVELOP mode")
 endif()
 
@@ -48,7 +48,7 @@ endif()
 # of modifying this function.
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
-  target_compile_options(${TARGET} PRIVATE -Wall -Werror)
+  target_compile_options(${TARGET} PRIVATE -Wall -Werror -Wno-sometimes-uninitialized)
   target_compile_options(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:-O3>")
   target_compile_definitions(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:NDEBUG>")
 endfunction()
@@ -63,6 +63,36 @@ pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 pkg_check_modules(DBUS REQUIRED dbus-1)
 
 add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
+# Stable D-Bus service name — strip the .develop suffix if present so both
+# debug and release builds call back into the same registered name.
+string(REGEX REPLACE "\\.develop$" "" DBUS_SERVICE_NAME "${APPLICATION_ID}")
+add_definitions(-DDBUS_SERVICE_NAME="${DBUS_SERVICE_NAME}")
+
+# Optional: Hyprland global shortcuts (requires wayland-client + wayland-scanner).
+find_program(WAYLAND_SCANNER wayland-scanner)
+pkg_check_modules(WAYLAND_CLIENT wayland-client)
+
+set(HYPRLAND_SOURCES "")
+if(WAYLAND_SCANNER AND WAYLAND_CLIENT_FOUND)
+  message(STATUS "wayland-scanner found – enabling Hyprland global shortcuts")
+
+  set(PROTO_XML "${CMAKE_CURRENT_SOURCE_DIR}/hyprland-global-shortcuts-v1.xml")
+  set(PROTO_HEADER "${CMAKE_CURRENT_BINARY_DIR}/hyprland-global-shortcuts-client-protocol.h")
+  set(PROTO_C      "${CMAKE_CURRENT_BINARY_DIR}/hyprland-global-shortcuts-protocol.c")
+
+  add_custom_command(
+    OUTPUT "${PROTO_HEADER}" "${PROTO_C}"
+    COMMAND "${WAYLAND_SCANNER}" client-header  "${PROTO_XML}" "${PROTO_HEADER}"
+    COMMAND "${WAYLAND_SCANNER}" private-code   "${PROTO_XML}" "${PROTO_C}"
+    DEPENDS "${PROTO_XML}"
+    COMMENT "Generating Hyprland global shortcuts Wayland bindings"
+  )
+
+  set(HYPRLAND_SOURCES "hyprland_shortcuts.cc" "${PROTO_C}")
+  add_definitions(-DHAS_HYPRLAND_SHORTCUTS)
+else()
+  message(STATUS "wayland-scanner or wayland-client not found – Hyprland global shortcuts disabled")
+endif()
 
 # Define the application target. To change its name, change BINARY_NAME above,
 # not the value here, or `flutter run` will no longer work.
@@ -71,6 +101,7 @@ add_definitions(-DAPPLICATION_ID="${APPLICATION_ID}")
 add_executable(${BINARY_NAME}
   "main.cc"
   "my_application.cc"
+  ${HYPRLAND_SOURCES}
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
 )
 
@@ -85,6 +116,13 @@ target_link_libraries(${BINARY_NAME} PRIVATE ${DBUS_LIBRARIES})
 
 # for dbus
 target_include_directories(${BINARY_NAME} PRIVATE ${DBUS_INCLUDE_DIRS})
+
+# Hyprland global shortcuts – generated headers live in the binary dir
+if(WAYLAND_SCANNER AND WAYLAND_CLIENT_FOUND)
+  target_include_directories(${BINARY_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+  target_link_libraries(${BINARY_NAME} PRIVATE ${WAYLAND_CLIENT_LIBRARIES})
+  target_include_directories(${BINARY_NAME} PRIVATE ${WAYLAND_CLIENT_INCLUDE_DIRS})
+endif()
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)

@@ -7,6 +7,10 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+#ifdef HAS_HYPRLAND_SHORTCUTS
+#include "hyprland_shortcuts.h"
+#endif
+
 #include <filesystem> 
 using namespace std;
 using namespace std::filesystem;
@@ -25,7 +29,7 @@ static void my_application_activate(GApplication* application) {
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
   
-  gtk_window_set_title(window, "commet");
+  gtk_window_set_title(window, "tungstn");
   
   const string iconFilename = "assets/images/app_icon/app_icon_rounded.png";
   path execDir = canonical(read_symlink("/proc/self/exe")).parent_path();
@@ -43,6 +47,10 @@ static void my_application_activate(GApplication* application) {
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+
+#ifdef HAS_HYPRLAND_SHORTCUTS
+  hyprland_shortcuts_init(APPLICATION_ID, DBUS_SERVICE_NAME);
+#endif
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }
@@ -71,6 +79,9 @@ static gboolean my_application_local_command_line(GApplication* application, gch
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
+#ifdef HAS_HYPRLAND_SHORTCUTS
+  hyprland_shortcuts_cleanup();
+#endif
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 
