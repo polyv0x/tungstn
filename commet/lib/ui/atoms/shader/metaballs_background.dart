@@ -25,6 +25,7 @@ class _MetaballsBackgroundState extends State<MetaballsBackground>
   static bool _loading = false;
 
   late final Ticker _ticker;
+  final _repaint = ValueNotifier<double>(0);
   double _time = 0;
   Duration? _last;
 
@@ -68,12 +69,13 @@ class _MetaballsBackgroundState extends State<MetaballsBackground>
       _time += (elapsed - _last!).inMicroseconds / 1e6;
     }
     _last = elapsed;
-    setState(() {});
+    _repaint.value = _time;
   }
 
   @override
   void dispose() {
     _ticker.dispose();
+    _repaint.dispose();
     super.dispose();
   }
 
@@ -83,7 +85,7 @@ class _MetaballsBackgroundState extends State<MetaballsBackground>
       return ColoredBox(color: _bg, child: widget.child);
     }
     return CustomPaint(
-      painter: _MetaballsPainter(_shader!, _time * _speed, _blobs),
+      painter: _MetaballsPainter(_shader!, _repaint, _speed, _blobs),
       child: widget.child,
     );
   }
@@ -91,22 +93,23 @@ class _MetaballsBackgroundState extends State<MetaballsBackground>
 
 class _MetaballsPainter extends CustomPainter {
   final FragmentShader shader;
-  final double time;
+  final ValueNotifier<double> repaintNotifier;
+  final double speed;
   final List<List<double>> blobs;
 
-  const _MetaballsPainter(this.shader, this.time, this.blobs);
+  _MetaballsPainter(this.shader, this.repaintNotifier, this.speed, this.blobs)
+      : super(repaint: repaintNotifier);
 
   @override
   void paint(Canvas canvas, Size size) {
+    final time = repaintNotifier.value * speed;
     final cx = size.width / 2;
     final cy = size.height / 2;
     final h = size.height;
 
-    // Uniform 0–1: uSize
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
 
-    // Uniforms 2–13: blob positions in pixel space (uB0..uB5)
     for (var i = 0; i < blobs.length; i++) {
       final b = blobs[i];
       final x = cx + h * b[0] * math.sin(time * b[2] + b[4]);
@@ -119,5 +122,5 @@ class _MetaballsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_MetaballsPainter old) => old.time != time;
+  bool shouldRepaint(_MetaballsPainter old) => old.shader != shader;
 }

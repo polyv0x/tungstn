@@ -1,7 +1,7 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 class StarTrailsBackground extends StatefulWidget {
   const StarTrailsBackground({super.key, this.child});
@@ -11,115 +11,106 @@ class StarTrailsBackground extends StatefulWidget {
   State<StarTrailsBackground> createState() => _StarTrailsBackgroundState();
 }
 
-class _StarTrailsBackgroundState extends State<StarTrailsBackground> {
-  static bool loadingShader = false;
-  static FragmentShader? shader;
-  late Timer timer;
-  double delta = 0;
-  bool animate = true;
+class _StarTrailsBackgroundState extends State<StarTrailsBackground>
+    with SingleTickerProviderStateMixin {
+  static const _bg = Color(0xFF0A0A14);
 
-  void loadShader() async {
-    loadingShader = true;
+  static bool _loadingShader = false;
+  static FragmentShader? _shader;
 
-    var program =
-        await FragmentProgram.fromAsset('assets/shader/constellation.frag');
-    shader = program.fragmentShader();
+  late final Ticker _ticker;
+  final _repaint = ValueNotifier<double>(0);
+  double _time = 0;
+  Duration? _last;
 
-    WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
-      if (mounted) {
-        setState(() {
-          loadingShader = false;
-        });
-      }
-    });
-  }
+  // Poor-performance auto-disable
+  Duration? _prevFrame;
+  int _slowFrames = 0;
+  bool _animate = true;
 
   @override
   void initState() {
     super.initState();
-    if (shader == null && loadingShader == false) {
-      loadShader();
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback(update);
-
-    timer = Timer.periodic(const Duration(milliseconds: 16), frameTimer);
+    if (_shader == null && !_loadingShader) _loadShader();
+    _ticker = createTicker(_onTick)..start();
   }
 
-  void frameTimer(Timer timer) {
-    if (animate) {
-      setState(() {
-        delta += 1 / 60;
-      });
-    } else {
-      timer.cancel();
+  Future<void> _loadShader() async {
+    _loadingShader = true;
+    try {
+      final program =
+          await FragmentProgram.fromAsset('assets/shader/constellation.frag');
+      _shader = program.fragmentShader();
+      if (mounted) setState(() {});
+    } catch (_) {
+      // Shader unsupported on this renderer — ColoredBox fallback stays.
+    } finally {
+      _loadingShader = false;
     }
+  }
+
+  void _onTick(Duration elapsed) {
+    if (!_animate) return;
+
+    // Poor-performance detection: disable after 10 consecutive sub-30fps frames
+    if (_prevFrame != null) {
+      final diff = elapsed - _prevFrame!;
+      if (diff.inMilliseconds > 33) {
+        _slowFrames++;
+        if (_slowFrames > 10) {
+          _animate = false;
+          _ticker.stop();
+          return;
+        }
+      } else {
+        _slowFrames = 0;
+      }
+    }
+    _prevFrame = elapsed;
+
+    if (_last != null) {
+      _time += (elapsed - _last!).inMicroseconds / 1e6;
+    }
+    _last = elapsed;
+    _repaint.value = _time;
   }
 
   @override
   void dispose() {
-    timer.cancel();
+    _ticker.dispose();
+    _repaint.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (shader == null) {
-      return const Center(child: CircularProgressIndicator());
-    } else {
-      return CustomPaint(
-        painter: StarTrailsPainter(shader!, delta * .3),
-        child: Container(
-          child: widget.child,
-        ),
-      );
+    if (_shader == null) {
+      return ColoredBox(
+          color: _bg, child: widget.child ?? const SizedBox.expand());
     }
-  }
-
-  Duration? previous;
-  int slowFrames = 0;
-  void update(Duration timeStamp) {
-    if (previous != null) {
-      var diff = timeStamp - previous!;
-      var fps = 1000 / diff.inMilliseconds;
-
-      if (fps < 30) {
-        slowFrames += 1;
-      }
-
-      if (slowFrames > 10) {
-        print("Disabling splash animation due to poor performance");
-        animate = false;
-      }
-    }
-
-    if (animate) {
-      previous = timeStamp;
-      if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback(update);
-      }
-    }
+    return CustomPaint(
+      painter: _StarTrailsPainter(_shader!, _repaint),
+      child: widget.child ?? const SizedBox.expand(),
+    );
   }
 }
 
-class StarTrailsPainter extends CustomPainter {
+class _StarTrailsPainter extends CustomPainter {
   final FragmentShader shader;
-  final double time;
+  final ValueNotifier<double> repaintNotifier;
 
-  const StarTrailsPainter(this.shader, this.time);
+  _StarTrailsPainter(this.shader, this.repaintNotifier)
+      : super(repaint: repaintNotifier);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-
+    final time = repaintNotifier.value * 0.3 * 0.3 + 10;
     shader.setFloat(0, size.width);
     shader.setFloat(1, size.height);
-    shader.setFloat(2, (time * 0.3) + 10);
-
-    paint.shader = shader;
-    canvas.drawRect(Offset.zero & size, paint);
+    shader.setFloat(2, time);
+    canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(_StarTrailsPainter old) => old.shader != shader;
 }

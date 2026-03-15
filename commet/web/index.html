@@ -24,15 +24,16 @@
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="commet">
+  <meta name="apple-mobile-web-app-title" content="tungstn">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon -->
+  <!-- Favicon — SVG supports prefers-color-scheme for dark/light tab icon -->
+  <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 
-  <title>commet</title>
+  <title>tungstn</title>
   <link rel="manifest" href="manifest.json">
 
   <script>
@@ -145,14 +146,23 @@
 
 
   <script>
+    // Use the html renderer on iOS/Safari — avoids the heavy CanvasKit WASM
+    // bundle and uses native WebKit APIs instead, giving much better perf on
+    // iPhone/iPad. Every other browser gets canvaskit for full fidelity.
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    var renderer = 'canvaskit';
+
     window.addEventListener('load', function (ev) {
-      // Download main.dart.js
       _flutter.loader.loadEntrypoint({
         serviceWorker: {
           serviceWorkerVersion: serviceWorkerVersion,
         },
         onEntrypointLoaded: function (engineInitializer) {
-          engineInitializer.initializeEngine().then(function (appRunner) {
+          engineInitializer.initializeEngine({
+            renderer: renderer,
+          }).then(function (appRunner) {
             appRunner.runApp();
           });
         }
