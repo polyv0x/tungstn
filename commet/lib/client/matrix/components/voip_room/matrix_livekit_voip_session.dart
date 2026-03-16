@@ -45,6 +45,7 @@ class MatrixLivekitVoipSession implements VoipSession {
     listener.on(onTrackUnmutedEvent);
     listener.on(onParticipantConnected);
     listener.on(onParticipantDisconnected);
+    listener.on<lk.RoomDisconnectedEvent>(onRoomDisconnected);
 
     Timer.periodic(Duration(milliseconds: 200), (timer) {
       if (state == VoipState.ended) timer.cancel();
@@ -176,6 +177,12 @@ class MatrixLivekitVoipSession implements VoipSession {
   void onParticipantDisconnected(lk.ParticipantDisconnectedEvent event) {
     clientManager?.callManager.endCallSound();
     _onParticipantsChanged.add(());
+  }
+
+  void onRoomDisconnected(lk.RoomDisconnectedEvent event) {
+    if (state == VoipState.ended) return;
+    Log.w("LiveKit room disconnected unexpectedly (reason: ${event.reason}), ending session");
+    hangUpCall();
   }
 
   void onLocalTrackPublished(lk.LocalTrackPublishedEvent event) {
@@ -555,12 +562,21 @@ class MatrixLivekitVoipSession implements VoipSession {
 
     heartbeatTimer =
         Timer.periodic(timerLength - Duration(seconds: 5), (timer) async {
-      print("Sending heartbeat");
-      final result = await room.matrixRoom.client.request(RequestType.POST,
-          "/client/unstable/org.matrix.msc4140/delayed_events/${Uri.encodeComponent(delayId)}",
-          contentType: "application/json",
-          data: jsonEncode({"action": "restart"}));
-      print(result);
+      if (state == VoipState.ended) {
+        timer.cancel();
+        return;
+      }
+      try {
+        await room.matrixRoom.client.request(RequestType.POST,
+            "/client/unstable/org.matrix.msc4140/delayed_events/${Uri.encodeComponent(delayId)}",
+            contentType: "application/json",
+            data: jsonEncode({"action": "restart"}));
+      } catch (e) {
+        Log.w("Heartbeat failed: $e — ending session");
+        timer.cancel();
+        heartbeatDelayId = null;
+        if (state != VoipState.ended) hangUpCall();
+      }
     });
   }
 
