@@ -4,39 +4,12 @@ name: build
 on:
   pull_request:
   merge_group:
+  workflow_dispatch:
 
 env:
   PROJECT_PATH: commet
 
 jobs:
-  build-windows:
-    runs-on: windows-2022
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          submodules: 'true'
-        
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2.8.0
-        with:
-          flutter-version: '3.41.1'
-          channel: 'stable'
-
-      - name: Configure Flutter
-        run: flutter config --enable-windows-desktop
-        
-      - name: Code Generation
-        run: |
-          cd .\commet
-          git config --global core.longpaths true
-          dart run scripts/codegen.dart
-
-      - name: Build Windows App
-        run: |
-          cd .\commet
-          flutter build windows --release --dart-define PLATFORM=windows
-
   build-android:
     runs-on: ubuntu-latest
     steps:
