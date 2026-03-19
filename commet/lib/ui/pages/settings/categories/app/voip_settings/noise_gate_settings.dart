@@ -143,6 +143,10 @@ class _NoiseGateSettingsState extends State<NoiseGateSettings> {
     _monitorStream?.getTracks().forEach((t) => t.stop());
     await _monitorStream?.dispose();
     _monitorStream = null;
+    // On web the noise suppressor holds the original getUserMedia stream alive
+    // (to keep iOS's mic hardware active). Dispose it so the tracks are stopped
+    // and the mic indicator clears.
+    if (PlatformUtils.isWeb) await NoiseSuppressor.dispose();
     if (mounted) {
       setState(() {
         _monitoring = false;
