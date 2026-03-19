@@ -74,6 +74,15 @@ class _NoiseGateSettingsState extends State<NoiseGateSettings> {
 
   Future<void> _startMonitoring() async {
     try {
+      // On web the gate works by patching getUserMedia, so initialize before
+      // the call so the AudioWorkletNode is created with the stream.
+      // On desktop the ADM pipeline starts after getUserMedia (see below).
+      if (PlatformUtils.isWeb) {
+        await NoiseSuppressor.initialize();
+        await NoiseSuppressor.setMode(NoiseProcessingMode.rmsGate);
+        await _configureProcessor();
+      }
+
       _monitorStream = await webrtc.navigator.mediaDevices.getUserMedia({
         'audio': {
           'echoCancellation': true,
@@ -96,10 +105,12 @@ class _NoiseGateSettingsState extends State<NoiseGateSettings> {
       final offer = await _monitorPc!.createOffer({});
       await _monitorPc!.setLocalDescription(offer);
 
-      // Register our processor so it sits in the now-active ADM pipeline.
-      await NoiseSuppressor.initialize();
-      await NoiseSuppressor.setMode(NoiseProcessingMode.rmsGate);
-      await _configureProcessor();
+      if (!PlatformUtils.isWeb) {
+        // Register our processor so it sits in the now-active ADM pipeline.
+        await NoiseSuppressor.initialize();
+        await NoiseSuppressor.setMode(NoiseProcessingMode.rmsGate);
+        await _configureProcessor();
+      }
 
       if (mounted) setState(() => _monitoring = true);
 
