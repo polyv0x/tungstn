@@ -7,7 +7,7 @@ import 'package:flutter_webrtc_noise_suppressor/flutter_webrtc_noise_suppressor.
 
 class WebrtcDefaultDevices {
   static Future<webrtc.MediaStream?> getDefaultMicrophone() async {
-    if (PlatformUtils.isAndroid || PlatformUtils.isWeb) return null;
+    if (PlatformUtils.isAndroid) return null;
 
     var devices = (await webrtc.navigator.mediaDevices.enumerateDevices())
         .where((i) => i.kind == "audioinput");
@@ -35,16 +35,21 @@ class WebrtcDefaultDevices {
       print("No default device set picking first");
     }
 
+    // On web the gate works by patching getUserMedia, so initialize must run
+    // BEFORE the call so the hook is in place when the stream is returned.
+    // On native the processor hooks into the ADM which only starts after getUserMedia.
+    if (PlatformUtils.isWeb) await _applyNoiseSuppressor();
+
     final stream = await webrtc.navigator.mediaDevices
         .getUserMedia({"audio": constraints});
 
-    await _applyNoiseSuppressor();
+    if (!PlatformUtils.isWeb) await _applyNoiseSuppressor();
 
     return stream;
   }
 
   static Future<void> _applyNoiseSuppressor() async {
-    if (PlatformUtils.isWeb || PlatformUtils.isAndroid) return;
+    if (PlatformUtils.isAndroid) return;
 
     if (preferences.noiseGateEnabled.value) {
       await NoiseSuppressor.initialize();

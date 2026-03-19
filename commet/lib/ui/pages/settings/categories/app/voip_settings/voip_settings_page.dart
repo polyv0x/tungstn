@@ -73,12 +73,11 @@ class _VoipSettingsPage extends State<VoipSettingsPage> {
           mode: tiamat.TileType.surfaceContainerLow,
           child: devicePicker(),
         ),
-        if (!PlatformUtils.isWeb)
-          tiamat.Panel(
-            header: "Noise Gate",
-            mode: tiamat.TileType.surfaceContainerLow,
-            child: const NoiseGateSettings(),
-          ),
+        tiamat.Panel(
+          header: "Noise Gate",
+          mode: tiamat.TileType.surfaceContainerLow,
+          child: const NoiseGateSettings(),
+        ),
         tiamat.Panel(
             header: "Stream Settings",
             mode: tiamat.TileType.surfaceContainerLow,
