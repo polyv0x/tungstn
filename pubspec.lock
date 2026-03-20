@@ -791,7 +791,7 @@ packages:
     description:
       path: "."
       ref: master
-      resolved-ref: f371950b4b0d39549289a77daf696a50aa652d13
+      resolved-ref: ffa61dd5d6cdfc19ed05381dbc02caf486047d3e
       url: "https://github.com/polyv0x/flutter_webrtc_noise_suppressor"
     source: git
     version: "0.1.0"
