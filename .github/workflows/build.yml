@@ -38,6 +38,13 @@ jobs:
           cd .\tungstn
           flutter build windows --release --dart-define PLATFORM=windows
 
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tungstn-windows
+          path: tungstn\build\windows\x64\runner\Release\
+
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -99,6 +106,13 @@ jobs:
         run: |
           cd $PROJECT_PATH
           flutter build apk --debug --dart-define PLATFORM=android
+
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tungstn-android.apk
+          path: ${{ env.PROJECT_PATH }}/build/app/outputs/flutter-apk/app-debug.apk
 
   build-android-google-services:
     runs-on: ubuntu-latest
@@ -163,6 +177,13 @@ jobs:
           cd $PROJECT_PATH
           flutter build apk --debug --dart-define ENABLE_GOOGLE_SERVICES=true --dart-define PLATFORM=android
 
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tungstn-android-google-services.apk
+          path: ${{ env.PROJECT_PATH }}/build/app/outputs/flutter-apk/app-debug.apk
+
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -196,6 +217,13 @@ jobs:
         run: |
           ldd $PROJECT_PATH/build/linux/x64/release/bundle/tungstn
 
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tungstn-linux
+          path: ${{ env.PROJECT_PATH }}/build/linux/x64/release/bundle/
+
   build-web:
     runs-on: ubuntu-latest
     steps:
@@ -224,3 +252,10 @@ jobs:
         run: |
           cd $PROJECT_PATH
           flutter build web --release --dart-define PLATFORM=web
+
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tungstn-web
+          path: ${{ env.PROJECT_PATH }}/build/web/
